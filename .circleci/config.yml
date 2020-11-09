@@ -10,7 +10,11 @@ jobs:
       - run: apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y clickhouse-server
       - run: service clickhouse-server start
       - run: swift build --enable-test-discovery
-      - run: CLICKHOUSE_SERVER=127.0.0.1 swift test --enable-test-discovery
+      - run: swift test --enable-test-discovery
+    environment:
+      CLICKHOUSE_SERVER: "127.0.0.1"
+      CLICKHOUSE_USER: "default"
+      CLICKHOUSE_PASSWORD: ""
 
 workflows:
   version: 2
