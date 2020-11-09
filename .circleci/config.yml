@@ -1,0 +1,19 @@
+version: 2
+
+jobs:
+  bionic:
+    docker:
+      - image: vapor/swift:5.1-bionic
+    steps:
+      - checkout
+      - run: apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4
+      - run: echo "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/" | tee /etc/apt/sources.list.d/clickhouse.list
+      - run: apt-get update; apt-get install -y clickhouse-server
+      - run: swift build
+      - run: swift test
+
+workflows:
+  version: 2
+  tests:
+    jobs:
+      - bionic
