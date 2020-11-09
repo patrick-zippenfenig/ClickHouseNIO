@@ -1,6 +1,6 @@
 # ClickHouseNIO
 
-![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-green.svg) ![Platforms](https://img.shields.io/badge/Platforms-macOS%20Linux-green.svg) [![codebeat badge](https://codebeat.co/badges/d15d7e95-d3df-4f97-974c-c3a7d9c07a9e)](https://codebeat.co/projects/github-com-patrick-zippenfenig-clickhousenio-main)
+![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-green.svg) ![Platforms](https://img.shields.io/badge/Platforms-macOS%20Linux-green.svg) [![codebeat badge](https://codebeat.co/badges/d15d7e95-d3df-4f97-974c-c3a7d9c07a9e)](https://codebeat.co/projects/github-com-patrick-zippenfenig-clickhousenio-main) [![CircleCI](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main.svg?style=svg)](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main) 
 
 High performance Swift [ClickHouse](https://clickhouse.tech) client based on [SwiftNIO 2](https://github.com/apple/swift-nio). It is inspired by the undocumented [C TCP client from ClickHouse](https://github.com/ClickHouse/ClickHouse/tree/master/src/Client), but written in pure Swift.
 
