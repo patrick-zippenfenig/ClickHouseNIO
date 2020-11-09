@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run: apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4; echo "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/" | tee /etc/apt/sources.list.d/clickhouse.list
       - run: apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y clickhouse-server
-      - run: systemctl start clickhouse-server
+      - run: service clickhouse-server start
       - run: swift build --enable-test-discovery
       - run: CLICKHOUSE_SERVER=127.0.0.1 swift test --enable-test-discovery
 
