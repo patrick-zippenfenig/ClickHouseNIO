@@ -179,6 +179,10 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
             return
             
         case .awaitingQueryConfirmation:
+            if case .progress(_) = response {
+                // For DROP table commands, clickhouse server 20.x sends also a progress message
+                return
+            }
             guard case .endOfStream = response else {
                 context.fireErrorCaught(ClickHouseError.expectedEndOfStream)
                 return

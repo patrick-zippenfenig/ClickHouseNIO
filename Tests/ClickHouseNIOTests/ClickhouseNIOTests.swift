@@ -54,7 +54,7 @@ final class ClickHouseNIOTests: XCTestCase {
             }
             XCTAssertEqual(error.code, 1040187392)
             XCTAssertEqual(error.name, "DB::Exception")
-            XCTAssertTrue(error.displayText.starts(with: "DB::Exception: Syntax error: failed at position 1: something wrong. Expected one of:"))
+            XCTAssertTrue(error.displayText.starts(with: "DB::Exception: Syntax error: failed at position 1"))
         }
         XCTAssertFalse(conn.connection.channel.isActive)
     }
