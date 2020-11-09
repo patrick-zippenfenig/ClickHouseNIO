@@ -9,7 +9,7 @@ jobs:
       - run: apt-key adv --keyserver keyserver.ubuntu.com --recv E0C56BD4
       - run: echo "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/" | tee /etc/apt/sources.list.d/clickhouse.list
       - run: apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y clickhouse-server
-      - run: swift build
+      - run: swift build --enable-test-discovery
       - run: swift test --enable-test-discovery
 
 workflows:
