@@ -1,7 +1,7 @@
 import XCTest
 
-import ClickhouseNIOTests
+import ClickHouseNIOTests
 
 var tests = [XCTestCaseEntry]()
-tests += ClickhouseNIOTests.allTests()
+tests += ClickHouseNIOTests.allTests()
 XCTMain(tests)
