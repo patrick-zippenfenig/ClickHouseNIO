@@ -16,6 +16,7 @@ class TestConnection {
         
         eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let clickHouseIp = ProcessInfo.processInfo.environment["CLICKHOUSE_SERVER"] ?? "172.25.101.30"
+        logger.info("Connecting to ClickHouse server at \(clickHouseIp)")
         let socket = try! SocketAddress(ipAddress: clickHouseIp, port: 9000)
         let config = ClickHouseConfiguration(serverAddresses: socket)
         connection = try! ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
