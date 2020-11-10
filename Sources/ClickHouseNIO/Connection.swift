@@ -123,6 +123,9 @@ public class ClickHouseConnection {
 
 extension Channel {
     func send(_ command: ClickHouseCommand) -> EventLoopFuture<ClickHouseResult> {
+        // Ensure we are in the correct eventloop
+        eventLoop.assertInEventLoop()
+        
         let p: EventLoopPromise<ClickHouseResult> = eventLoop.makePromise()
         return writeAndFlush((command, p)).flatMap {
             return p.futureResult.flatMapThrowing { res in
