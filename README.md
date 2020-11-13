@@ -4,7 +4,13 @@
 
 High performance Swift [ClickHouse](https://clickhouse.tech) client based on [SwiftNIO 2](https://github.com/apple/swift-nio). It is inspired by the undocumented [C TCP client from ClickHouse](https://github.com/ClickHouse/ClickHouse/tree/master/src/Client), but written in pure Swift.
 
-This client provides raw query capabilities. Connection pooling or relational abstraction may be implemented on top of this library. For connection pooling consider using `EventLoopGroupConnectionPool` from Vapor framework.
+Features:
+- Asynchronous Swift NIO implementation. Perfect for concurrent APIs.
+- Native Swift data types support. Per table column a simple `[Float]`, `[Int]` or `[String]` array can be used.
+- Simple `query()`, `command()` and `insert()` operations
+
+This client provides raw query capabilities. Connection pooling or relational abstraction may be implemented on top of this library. For connection pooling and integration into Vapor use, [ClickHouseVapor](https://github.com/patrick-zippenfenig/ClickHouseVapor).
+
 
 ## Installation:
 
@@ -95,7 +101,8 @@ try! conn.connection.query(sql: "SELECT * FROM test").map { res in
 
 ## TODO
 - Data message decoding is not optimal, because we grow the buffer until the whole message fits. This could result in reduced performance, the first time a very large query is executed.
-- `Totals` and `Extremes` messages are not implemented
+- Advanced queries, that report the current `progress` of the query. This could be interesting in the context of Websockets.
+- `extremes` feature from ClickHouse to report min/max/mean metrics along the actual data result
 - swift metrics support
 
 
