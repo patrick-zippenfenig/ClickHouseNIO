@@ -1,18 +1,22 @@
 import NIO
+import NIOSSL
 import Logging
 @_exported import class NIO.EventLoopFuture
+@_exported import struct NIOSSL.TLSConfiguration
 
 public struct ClickHouseConfiguration {
-    public var serverAddresses: SocketAddress
-    public var user: String
-    public var password: String
-    public var database: String
+    public let serverAddresses: SocketAddress
+    public let user: String
+    public let password: String
+    public let database: String
+    public let tlsConfiguration: TLSConfiguration?
     
-    public init(serverAddresses: SocketAddress, user: String? = nil, password: String? = nil, database: String? = nil) {
+    public init(serverAddresses: SocketAddress, user: String? = nil, password: String? = nil, database: String? = nil, tlsConfiguration: TLSConfiguration? = nil) {
         self.serverAddresses = serverAddresses
         self.user = user ?? "default"
         self.password = password ?? "admin"
         self.database = database ?? "default"
+        self.tlsConfiguration = tlsConfiguration
     }
     
     public init(
@@ -20,13 +24,15 @@ public struct ClickHouseConfiguration {
         port: Int = ClickHouseConnection.defaultPort,
         user: String? = nil,
         password: String? = nil,
-        database: String? = nil
+        database: String? = nil,
+        tlsConfiguration: TLSConfiguration? = nil
     ) throws {
         try self.init(
             serverAddresses: .makeAddressResolvingHost(hostname, port: port),
             user: user,
             password: password,
-            database: database
+            database: database,
+            tlsConfiguration: tlsConfiguration
         )
     }
 }
@@ -60,12 +66,22 @@ public class ClickHouseConnection {
             ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR),
             value: 1
         ).channelInitializer { channel in
-            return EventLoopFuture<Void>.andAllSucceed([
-                channel.pipeline.addHandler(MessageToByteHandler(ClickHouseMessageEncoder()), name: "ClickHouseMessageEncoder"),
-                channel.pipeline.addHandler(ByteToMessageHandler(ClickHouseMessageDecoder()), name: "ClickHouseByteDecoder"),
-                channel.pipeline.addHandler(ClickHouseChannelHandler(logger: logger), name: "ClickHouseChannelHandler"),
-                channel.pipeline.addHandler(RequestResponseHandler<ClickHouseCommand, ClickHouseResult>(), name: "RequestResponseHandler")
-            ], on: channel.eventLoop)
+            do {
+                let ssl = try configuration.tlsConfiguration.map { tls -> EventLoopFuture<Void> in
+                    let sslContext = try NIOSSLContext(configuration: tls)
+                    let handler = try NIOSSLClientHandler(context: sslContext, serverHostname: nil)
+                    return channel.pipeline.addHandler(handler)
+                }
+                return EventLoopFuture<Void>.andAllSucceed([
+                    ssl ?? channel.eventLoop.makeSucceededFuture(()),
+                    channel.pipeline.addHandler(MessageToByteHandler(ClickHouseMessageEncoder()), name: "ClickHouseMessageEncoder"),
+                    channel.pipeline.addHandler(ByteToMessageHandler(ClickHouseMessageDecoder()), name: "ClickHouseByteDecoder"),
+                    channel.pipeline.addHandler(ClickHouseChannelHandler(logger: logger), name: "ClickHouseChannelHandler"),
+                    channel.pipeline.addHandler(RequestResponseHandler<ClickHouseCommand, ClickHouseResult>(), name: "RequestResponseHandler")
+                ], on: channel.eventLoop)
+            } catch {
+                return channel.eventLoop.makeFailedFuture(error)
+            }
         }
         
         return client.connect(to: configuration.serverAddresses).flatMap { channel in

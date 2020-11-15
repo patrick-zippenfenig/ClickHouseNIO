@@ -19,8 +19,12 @@ class TestConnection {
         let user = ProcessInfo.processInfo.environment["CLICKHOUSE_USER"] ?? "default"
         let password = ProcessInfo.processInfo.environment["CLICKHOUSE_PASSWORD"] ?? "admin"
         logger.info("Connecting to ClickHouse server at \(ip)")
-        let socket = try! SocketAddress(ipAddress: ip, port: 9000)
-        let config = ClickHouseConfiguration(serverAddresses: socket, user: user, password: password)
+        // openssl req -subj "/CN=my.host.name" -days 365 -nodes -new -x509 -keyout /etc/clickhouse-server/server.key -out /etc/clickhouse-server/server.crt
+        // openssl dhparam -out /etc/clickhouse-server/dhparam.pem 1024 // NOTE use 4096 in prod
+        // chown -R clickhouse:clickhouse /etc/clickhouse-server/
+        let socket = try! SocketAddress(ipAddress: ip, port: 9440)
+        let tls = TLSConfiguration.forClient(certificateVerification: .none)
+        let config = ClickHouseConfiguration(serverAddresses: socket, user: user, password: password, tlsConfiguration: tls)
         connection = try! ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
     }
     
