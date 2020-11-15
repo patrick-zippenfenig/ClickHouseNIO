@@ -10,7 +10,7 @@ jobs:
       - run: apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y clickhouse-server
       - run: openssl req -subj "/CN=my.host.name" -days 365 -nodes -new -x509 -keyout /etc/clickhouse-server/server.key -out /etc/clickhouse-server/server.crt
       - run: openssl dhparam -out /etc/clickhouse-server/dhparam.pem 1024
-      - run: echo .circleci/clickhouse.config.xml > /etc/clickhouse-server/config.xml
+      - run: cat .circleci/clickhouse.config.xml > /etc/clickhouse-server/config.xml
       - run: chown -R clickhouse:clickhouse /etc/clickhouse-server/
       - run: service clickhouse-server start
       - run: swift build --enable-test-discovery
