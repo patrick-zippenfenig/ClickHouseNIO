@@ -69,7 +69,7 @@ public class ClickHouseConnection {
             do {
                 let ssl = try configuration.tlsConfiguration.map { tls -> EventLoopFuture<Void> in
                     let sslContext = try NIOSSLContext(configuration: tls)
-                    let handler = try NIOSSLClientHandler(context: sslContext, serverHostname: nil)
+                    let handler = try NIOSSLClientHandler(context: sslContext, serverHostname: configuration.serverAddresses.host)
                     return channel.pipeline.addHandler(handler)
                 }
                 return EventLoopFuture<Void>.andAllSucceed([
@@ -179,4 +179,18 @@ enum Stages : UInt64 {
 public enum CompressionState : UInt64 {
     case Disable     = 0;
     case Enable      = 1;
+}
+
+extension SocketAddress {
+    /// Hostname if known
+    var host: String? {
+        switch self {
+        case .v4(let v):
+            return v.host.isEmpty ? nil : v.host
+        case .v6(let v):
+            return v.host.isEmpty ? nil : v.host
+        case .unixDomainSocket(_):
+            return nil
+        }
+    }
 }
