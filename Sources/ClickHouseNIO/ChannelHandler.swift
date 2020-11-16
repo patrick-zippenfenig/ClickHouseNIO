@@ -104,7 +104,8 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         logger.trace("Received message from clickhouse \(response)")
         
         if case .exception(let error) = response {
-            context.fireErrorCaught(error)
+            state = .ready
+            context.fireChannelRead(wrapInboundOut(ClickHouseResult.error(error)))
             return
         }
         
@@ -205,7 +206,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
             }
             logger.debug("Connecting to \(database) user \(user)")
             state = .connecting
-            context.write(wrapOutboundOut(.clientConnect(database: database, user: user, password: password)), promise: promise)
+            context.writeAndFlush(wrapOutboundOut(.clientConnect(database: database, user: user, password: password)), promise: promise)
             
         case .ready:
             switch request {
@@ -215,25 +216,25 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
                 
             case .query(let sql):
                 logger.debug("Sending query \(sql)")
-                context.write(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
+                context.writeAndFlush(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
                 state = .awaitingQueryResult(blocks: [DataMessage]())
                 
             case .command(let sql):
                 logger.debug("Sending command \(sql)")
-                context.write(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
+                context.writeAndFlush(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
                 state = .awaitingQueryConfirmation
                 
             case .insert(let table, let data):
                 logger.debug("Inserting \(data.count) columns into table \(table)")
                 let columns = data.map { $0.name }.joined(separator: ",")
                 let sql = "INSERT INTO \(table) (\(columns)) VALUES"
-                context.write(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
+                context.writeAndFlush(wrapOutboundOut(.query(sql: sql, revision: revision)), promise: promise)
                 state = .awaitingToSendData(data: data)
             
             case .ping:
                 logger.debug("Sending ping")
                 state = .awaitingPong
-                context.write(wrapOutboundOut(.ping), promise: promise)
+                context.writeAndFlush(wrapOutboundOut(.ping), promise: promise)
             }
             
         default:

@@ -11,7 +11,7 @@ class TestConnection {
     
     init() {
         var logger = ClickHouseLogging.base
-        logger.logLevel = .debug
+        logger.logLevel = .trace
         self.logger = logger
         
         eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -38,9 +38,9 @@ final class ClickHouseNIOTests: XCTestCase {
     var conn = TestConnection()
     
     func testShowDatabases() {
-        try! conn.connection.query(sql: "SHOW DATABASES;").map{res in
+        XCTAssertNoThrow(try conn.connection.query(sql: "SHOW DATABASES;").map{res in
             print(res)
-        }.wait()
+        }.wait())
     }
     
     func testPing() {
@@ -49,8 +49,7 @@ final class ClickHouseNIOTests: XCTestCase {
     
     func testSyntaxError() {
         // Test correct throw on syntax error
-        // If invalid SQL is send, and exception is thrown, BUT the empty clickhouse block throws a second exception because we send unexpected data.
-        // The connection is terminated afterwards by clickhouse
+        // If invalid SQL is send, and exception is thrown, but the connection is supposed to stay active
         XCTAssertThrowsError(try conn.connection.command(sql: "something wrong").wait(), "awdawf") { e in
             guard case let error as ExceptionMessage = e else {
                 XCTFail()
@@ -60,7 +59,9 @@ final class ClickHouseNIOTests: XCTestCase {
             XCTAssertEqual(error.name, "DB::Exception")
             XCTAssertTrue(error.displayText.starts(with: "DB::Exception: Syntax error: failed at position 1"))
         }
-        XCTAssertFalse(conn.connection.channel.isActive)
+        XCTAssertNoThrow(try conn.connection.ping().wait())
+        XCTAssertFalse(conn.connection.isClosed)
+        XCTAssertTrue(conn.connection.channel.isActive)
     }
     
     /// Test correct string truncation with multibyte character
