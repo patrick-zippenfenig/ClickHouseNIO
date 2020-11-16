@@ -97,6 +97,20 @@ try! conn.connection.query(sql: "SELECT * FROM test").map { res in
 }.wait()
 ```
 
+## Secure TLS connections
+For TLS encrypted connections to the ClickHouse server, a `tlsConfiguration` attribute can be set in the configuration. Usually port 9440 is used. `certificateVerification: .none` disables certificate verification for self signed certificates. TLS connections use BoringSSL with [SwiftNIO SSL](https://github.com/apple/swift-nio-ssl).
+
+```swift
+let tls = TLSConfiguration.forClient(certificateVerification: .none)
+
+let config = try ClickHouseConfiguration(
+    hostname: "localhost", 
+    port: 9440, 
+    user: "default", 
+    password: "admin", 
+    database: "default",
+    tlsConfiguration: tls)
+```
 
 
 ## TODO
