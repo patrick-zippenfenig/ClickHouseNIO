@@ -307,7 +307,8 @@ extension UUID {
     /// Swap  bytes  before sending to clickhouse and after retrieval
     fileprivate func swapBytes() -> UUID {
         let bytes = self.uuid
-        let b = (bytes.15, bytes.14, bytes.13, bytes.12, bytes.11, bytes.10, bytes.9, bytes.8, bytes.7, bytes.6, bytes.5, bytes.4, bytes.3, bytes.2, bytes.1, bytes.0)
+        let b = ( bytes.7, bytes.6,  bytes.5,  bytes.4,  bytes.3,  bytes.2,  bytes.1, bytes.0,
+                 bytes.15, bytes.14, bytes.13, bytes.12, bytes.11, bytes.10, bytes.9, bytes.8)
         return UUID(uuid: b)
     }
 }
