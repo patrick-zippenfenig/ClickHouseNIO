@@ -145,6 +145,23 @@ extension ByteBuffer {
         return array
     }
     
+    mutating func readUuidArray(numRows: Int, endianness: Endianness = .big) -> [UUID]? {
+        guard readableBytes >= MemoryLayout<UUID>.size * numRows else {
+            return nil
+        }
+        return [UUID](unsafeUninitializedCapacity: numRows) { (buffer, initializedCount) in
+            let numBytes = readableBytesView.withUnsafeBytes({ $0.copyBytes(to: buffer)})
+            assert(numBytes / MemoryLayout<UUID>.size == numRows)
+            moveReaderIndex(forwardBy: numBytes)
+            if endianness == .little {
+                for (i,e) in buffer.enumerated() {
+                    buffer[i] = e.swapBytes()
+                }
+            }
+            initializedCount = numRows
+        }
+    }
+    
     /**
      Read bytes as a specific array type. The data type should be continuously stored in memory. E.g. Does not work with strings
      TODO: Ensure that this works for all types... endians might also be an issue
@@ -166,5 +183,34 @@ extension ByteBuffer {
         for element in array {
             writeInteger(element, endianness: .little)
         }
+    }
+    
+    /// Write UUID array for clickhouse
+    mutating func writeUuidArray(_ array: [UUID], endianness: Endianness = .big) {
+        reserveCapacity(array.count * MemoryLayout<UUID>.size + writableBytes)
+        for element in array {
+            switch endianness {
+            case .big:
+                let _ = withUnsafeBytes(of: element) {
+                    writeBytes($0)
+                }
+            case .little:
+                let _ = withUnsafeBytes(of: element.swapBytes()) {
+                    writeBytes($0)
+                }
+            }
+            
+
+        }
+    }
+}
+
+extension UUID {
+    /// Swap bytes before sending to clickhouse and after retrieval
+    fileprivate func swapBytes() -> UUID {
+        let bytes = self.uuid
+        let b = (bytes.7,  bytes.6,  bytes.5,  bytes.4,  bytes.3,  bytes.2,  bytes.1, bytes.0,
+                 bytes.15, bytes.14, bytes.13, bytes.12, bytes.11, bytes.10, bytes.9, bytes.8)
+        return UUID(uuid: b)
     }
 }

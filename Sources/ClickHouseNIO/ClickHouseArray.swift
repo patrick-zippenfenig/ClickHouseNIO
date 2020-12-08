@@ -207,9 +207,7 @@ extension ByteBuffer {
                 writeBytes($0)
             }
         } else if let array = array as? [UUID] {
-            let _ = array.withUnsafeBytes {
-                writeBytes($0)
-            }
+            writeUuidArray(array, endianness: .little)
         } else if let length = fixedLength, let array = array as? [String] {
             writeClickHouseFixedStrings(array, length: length)
         } else if let array = array as? [String] {
@@ -253,7 +251,7 @@ extension ByteBuffer {
             }
             return array
         case .uuid:
-            guard let array: [UUID] = readUnsafeGenericArray(numRows: numRows) else {
+            guard let array = readUuidArray(numRows: numRows, endianness: .little) else {
                 return nil
             }
             return array
