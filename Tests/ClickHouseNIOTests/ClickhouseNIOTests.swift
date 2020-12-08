@@ -135,4 +135,40 @@ ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
             XCTAssertEqual((0..<count).map{String("\($0)".prefix(2))}, str)
         }.wait()
     }
+    
+    func testUUID() {
+        try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
+        let sql = """
+            CREATE TABLE test
+            (
+            id Int32,
+            uuid UUID
+            )
+            ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
+            """
+        try! conn.connection.command(sql: sql).wait()
+        
+        let uuidStrings : [String] = ["ba4a9cd7-c69c-9fe8-5335-7631f448b597", "ad4f8401-88ff-ca3d-0443-e0163288f691", "5544beae-2370-c5e8-b8b6-c6c46156d28d"]
+        let uuids = uuidStrings.map { UUID(uuidString: $0)!}
+        let ids : [Int32] = [1, 2, 3]
+        print(uuids)
+        let data = [
+            ClickHouseColumn("id", ids),
+            ClickHouseColumn("uuid", uuids)
+        ]
+        
+        try! conn.connection.insert(into: "test", data: data).wait()
+        
+        try! conn.connection.query(sql: "SELECT id, uuid, toString(uuid) as uuidString FROM test").map { res in
+            print(res)
+            guard let datatype = res.columns.first(where: {$0.name == "uuidString"})!.values as? [String] else {
+                fatalError("Column `uuidString`, was not a String array")
+            }
+            XCTAssertEqual(datatype, uuidStrings )
+            guard let id = res.columns.first(where: {$0.name == "id"})!.values as? [Int32] else {
+                fatalError("Column `id`, was not an Int32 array")
+            }
+            XCTAssertEqual(id, [1, 2, 3])
+        }.wait()
+    }
 }

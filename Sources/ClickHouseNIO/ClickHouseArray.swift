@@ -207,7 +207,8 @@ extension ByteBuffer {
                 writeBytes($0)
             }
         } else if let array = array as? [UUID] {
-            let _ = array.withUnsafeBytes {
+            let swaped = array.map { $0.swapBytes() }
+            let _ = swaped.withUnsafeBytes {
                 writeBytes($0)
             }
         } else if let length = fixedLength, let array = array as? [String] {
@@ -256,7 +257,8 @@ extension ByteBuffer {
             guard let array: [UUID] = readUnsafeGenericArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            let swapped = array.map { $0.swapBytes() }
+            return swapped
         case .fixedString(let fixedStringLength):
             var strings = [String]()
             strings.reserveCapacity(numRows)
@@ -298,5 +300,14 @@ extension ByteBuffer {
             }
             return array
         }
+    }
+}
+
+extension UUID {
+    /// Swap  bytes  before sending to clickhouse and after retrieval
+    fileprivate func swapBytes() -> UUID {
+        let bytes = self.uuid
+        let b = (bytes.15, bytes.14, bytes.13, bytes.12, bytes.11, bytes.10, bytes.9, bytes.8, bytes.7, bytes.6, bytes.5, bytes.4, bytes.3, bytes.2, bytes.1, bytes.0)
+        return UUID(uuid: b)
     }
 }
