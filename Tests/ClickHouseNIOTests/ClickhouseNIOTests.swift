@@ -71,13 +71,13 @@ final class ClickHouseNIOTests: XCTestCase {
         let fixedLength = 7
         
         let sql = """
-        CREATE TABLE test
-        (
-        id String,
-        string FixedString(\(fixedLength))
-        )
-        ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
-        """
+            CREATE TABLE test
+            (
+            id String,
+            string FixedString(\(fixedLength))
+            )
+            ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
+            """
         try! conn.connection.command(sql: sql).wait()
         
         let data = [
@@ -104,16 +104,16 @@ final class ClickHouseNIOTests: XCTestCase {
         try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
         
         let sql = """
-CREATE TABLE test
-(
-    stationid Int32,
-    timestamp Int64,
-    value Float32,
-    varstring String,
-    fixstring FixedString(2)
-)
-ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
-"""
+            CREATE TABLE test
+            (
+                stationid Int32,
+                timestamp Int64,
+                value Float32,
+                varstring String,
+                fixstring FixedString(2)
+            )
+            ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
+            """
         try! conn.connection.command(sql: sql).wait()
         let count = 110
         
