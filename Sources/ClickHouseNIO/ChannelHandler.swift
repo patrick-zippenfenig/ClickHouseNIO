@@ -188,7 +188,6 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
                 return
             }
             if case .data(_) = response {
-                print(response)
                 // if command is used we are not interested in the data...
                 return
             }
