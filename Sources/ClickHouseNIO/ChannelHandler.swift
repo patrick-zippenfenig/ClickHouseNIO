@@ -192,7 +192,6 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
                 return
             }
             guard case .endOfStream = response else {
-                print(response)
                 context.fireErrorCaught(ClickHouseError.expectedEndOfStream)
                 return
             }
