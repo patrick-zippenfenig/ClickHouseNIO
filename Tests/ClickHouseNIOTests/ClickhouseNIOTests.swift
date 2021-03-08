@@ -171,4 +171,36 @@ ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
             XCTAssertEqual(id, [1, 2, 3])
         }.wait()
     }
+    
+    
+    func testCommandForInsertsFromSelectWorks() {
+        try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
+        
+        let sql = """
+CREATE TABLE test
+(
+    stationid Int32,
+    timestamp Int64,
+    value Float32,
+    varstring String,
+    fixstring FixedString(2)
+)
+ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
+"""
+        try! conn.connection.command(sql: sql).wait()
+        let count = 110
+        
+        let data = [
+            ClickHouseColumn("stationid", (0..<count).map{Int32($0)}),
+            ClickHouseColumn("timestamp", (0..<count).map{Int64($0)}),
+            ClickHouseColumn("value", (0..<count).map{Float($0)}),
+            ClickHouseColumn("varstring", (0..<count).map{"\($0)"}),
+            ClickHouseColumn("fixstring", (0..<count).map{"\($0)"})
+        ]
+        
+        try! conn.connection.insert(into: "test", data: data).wait()
+        
+        // insert again, but this time via a select from the database
+        try! conn.connection.command(sql: "Insert into test Select * from test").wait()
+    }
 }
