@@ -112,6 +112,27 @@ let config = try ClickHouseConfiguration(
     tlsConfiguration: tls)
 ```
 
+## Timeouts
+Because networks unreliable by nature, ClickHouseNIO uses different timeouts to prevent potential deadlocks while waiting for a server response. All timeouts can be controlled via `ClickHouseConfiguration` and use default values as shown below:
+
+```swift
+
+let config = try ClickHouseConfiguration(
+    hostname: "localhost", 
+    ...,
+    connectTimeout: .seconds(10),
+    readTimeout: .seconds(90),
+    queryTimeout: .seconds(600))
+,
+```
+
+All timeouts will close the connection. Different timeouts trigger different exceptions:
+- `connectTimeout` will throw `NIO.ChannelError.connectTimeout(TimeAmount)` if the connection to the ClickHouse server cannot be establised after this period of time.
+- `readTimeout`: If a query is running, and the ClickHouseNIO client does not receive any network package, the conncection is closed and throws `ClickHouseError.readTimeout`. This can happen, if the network connection is interrupted while waiting for a response. Usually, even while waiting for a query result, packages are exchanged very frequently.
+- `queryTimeout` is the total time after a query will be terminated and the connection is closed. Because ClickHouseNIO is also capable of queueing queries, this includes the time in the queue as well. On a very busy server, a long waiting time starts to close connections. If a connection is closed, all queries in the queue will return a failed future with the exception `ClickHouseError.queryTimeout`. 
+
+Timeouts can also be specified for a single query with `connection.command(sql: sql, timeout: .seconds(30))`, but keep in mind that this also includes queue time.
+
 
 ## TODO
 - Data message decoding is not optimal, because we grow the buffer until the whole message fits. This could result in reduced performance, the first time a very large query is executed.

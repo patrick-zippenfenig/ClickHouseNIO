@@ -50,6 +50,14 @@ struct DataMessage {
         }
         
         // compression would go here and has to decompress the bytebuffer stream
+        // https://github.com/ClickHouse/clickhouse-cpp/blob/master/clickhouse/base/compressed.cpp
+        // 128 bit checksum CityHash128
+        // method is defined by server setting: https://github.com/ClickHouse/ClickHouse/blob/9974ab5928713ccbfc62db8fee20fd74cd00b027/docs/en/operations/settings/settings.md#network_compression_method-network_compression_method
+        // default lz4
+        // uint8 method  0x82 == LZ4
+        // uint32 size compressed
+        // uint32 size original
+        // https://github.com/adam-fowler/compress-nio/blob/main/Sources/CompressNIO/lz4.swift
         
         if revision >= ClickHouseMessageDecoder.DBMS_MIN_REVISION_WITH_BLOCK_INFO {
             guard let num1 = buffer.readVarInt64(),

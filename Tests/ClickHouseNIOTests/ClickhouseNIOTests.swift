@@ -24,7 +24,8 @@ class TestConnection {
         // chown -R clickhouse:clickhouse /etc/clickhouse-server/
         let socket = try! SocketAddress(ipAddress: ip, port: 9440)
         let tls = TLSConfiguration.forClient(certificateVerification: .none)
-        let config = ClickHouseConfiguration(serverAddresses: socket, user: user, password: password, tlsConfiguration: tls)
+        let config = ClickHouseConfiguration(
+            serverAddresses: socket, user: user, password: password, connectTimeout: .seconds(10), readTimeout: .seconds(3), queryTimeout: .seconds(5), tlsConfiguration: tls)
         connection = try! ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
     }
     
@@ -134,6 +135,15 @@ final class ClickHouseNIOTests: XCTestCase {
             }
             XCTAssertEqual((0..<count).map{String("\($0)".prefix(2))}, str)
         }.wait()
+    }
+    
+    func testTimeout() {
+        XCTAssertThrowsError(try conn.connection.command(sql: "SELECT sleep(3)", timeout: .milliseconds(1500)).wait()) { error in
+            guard case ClickHouseError.queryTimeout = error else {
+                XCTFail()
+                return
+            }
+        }
     }
     
     func testUUID() {

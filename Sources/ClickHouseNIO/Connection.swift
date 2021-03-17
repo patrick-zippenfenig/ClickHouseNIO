@@ -3,6 +3,7 @@ import NIOSSL
 import Logging
 @_exported import class NIO.EventLoopFuture
 @_exported import struct NIOSSL.TLSConfiguration
+@_exported import struct NIO.TimeAmount
 
 public struct ClickHouseConfiguration {
     public let serverAddresses: SocketAddress
@@ -10,13 +11,28 @@ public struct ClickHouseConfiguration {
     public let password: String
     public let database: String
     public let tlsConfiguration: TLSConfiguration?
+    public let connectTimeout: TimeAmount
+    public let readTimeout: TimeAmount
+    public let queryTimeout: TimeAmount
     
-    public init(serverAddresses: SocketAddress, user: String? = nil, password: String? = nil, database: String? = nil, tlsConfiguration: TLSConfiguration? = nil) {
+    public init(
+        serverAddresses: SocketAddress,
+        user: String? = nil,
+        password: String? = nil,
+        database: String? = nil,
+        connectTimeout: TimeAmount = .seconds(10),
+        readTimeout: TimeAmount = .seconds(90),
+        queryTimeout: TimeAmount = .seconds(600),
+        tlsConfiguration: TLSConfiguration? = nil
+    ) {
         self.serverAddresses = serverAddresses
         self.user = user ?? "default"
         self.password = password ?? "admin"
         self.database = database ?? "default"
         self.tlsConfiguration = tlsConfiguration
+        self.readTimeout = readTimeout
+        self.queryTimeout = queryTimeout
+        self.connectTimeout = connectTimeout
     }
     
     public init(
@@ -25,6 +41,9 @@ public struct ClickHouseConfiguration {
         user: String? = nil,
         password: String? = nil,
         database: String? = nil,
+        connectTimeout: TimeAmount = .seconds(10),
+        readTimeout: TimeAmount = .seconds(90),
+        queryTimeout: TimeAmount = .seconds(600),
         tlsConfiguration: TLSConfiguration? = nil
     ) throws {
         try self.init(
@@ -32,6 +51,9 @@ public struct ClickHouseConfiguration {
             user: user,
             password: password,
             database: database,
+            connectTimeout: connectTimeout,
+            readTimeout: readTimeout,
+            queryTimeout: queryTimeout,
             tlsConfiguration: tlsConfiguration
         )
     }
@@ -45,6 +67,8 @@ public class ClickHouseConnection {
     
     internal let channel: Channel
     
+    internal let queryTimeout: TimeAmount
+    
     /// Set to true if `close()` was called
     private var _isClosed = false
     
@@ -57,12 +81,14 @@ public class ClickHouseConnection {
         return channel.eventLoop
     }
     
-    fileprivate init(channel: Channel) {
+    fileprivate init(channel: Channel, queryTimeout: TimeAmount) {
         self.channel = channel
+        self.queryTimeout = queryTimeout
     }
 
     public static func connect(configuration: ClickHouseConfiguration, on eventLoop: EventLoop, logger: Logger = .clickHouseBaseLogger) -> EventLoopFuture<ClickHouseConnection> {
-        let client = ClientBootstrap(group: eventLoop).channelOption(
+        let client = ClientBootstrap(group: eventLoop).connectTimeout(configuration.connectTimeout)
+        .channelOption(
             ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR),
             value: 1
         ).channelInitializer { channel in
@@ -73,6 +99,7 @@ public class ClickHouseConnection {
                     return channel.pipeline.addHandler(handler)
                 }
                 return EventLoopFuture<Void>.andAllSucceed([
+                    channel.pipeline.addHandler(IdleStateHandler(readTimeout: configuration.readTimeout)),
                     ssl ?? channel.eventLoop.makeSucceededFuture(()),
                     channel.pipeline.addHandler(MessageToByteHandler(ClickHouseMessageEncoder()), name: "ClickHouseMessageEncoder"),
                     channel.pipeline.addHandler(ByteToMessageHandler(ClickHouseMessageDecoder()), name: "ClickHouseByteDecoder"),
@@ -85,17 +112,17 @@ public class ClickHouseConnection {
         }
         
         return client.connect(to: configuration.serverAddresses).flatMap { channel in
-            return channel.send(.clientConnect(database: configuration.database, user: configuration.user, password: configuration.password)).map { res in
+            return channel.send(.clientConnect(database: configuration.database, user: configuration.user, password: configuration.password), timeout: configuration.queryTimeout).map { res in
                 guard case ClickHouseResult.serverInfo(_) = res else {
                     fatalError("ClickHouse did not reply with a serverInfo")
                 }
-                return ClickHouseConnection(channel: channel)
+                return ClickHouseConnection(channel: channel, queryTimeout: configuration.queryTimeout)
             }
         }
     }
     
-    public func ping() -> EventLoopFuture<Void> {
-        return channel.send(.ping).map { res in
+    public func ping(timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
+        return channel.send(.ping, timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.pong = res else {
                 fatalError("ClickHouse did not reply with poing")
             }
@@ -103,8 +130,8 @@ public class ClickHouseConnection {
         }
     }
     
-    public func query(sql: String) -> EventLoopFuture<ClickHouseQueryResult> {
-        return channel.send(.query(sql: sql)).map { res in
+    public func query(sql: String, timeout: TimeAmount? = nil) -> EventLoopFuture<ClickHouseQueryResult> {
+        return channel.send(.query(sql: sql), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.result(let result) = res else {
                 fatalError("ClickHouse did not reply with a query result")
             }
@@ -112,8 +139,8 @@ public class ClickHouseConnection {
         }
     }
     
-    public func command(sql: String) -> EventLoopFuture<Void> {
-        return channel.send(.command(sql: sql)).map { res in
+    public func command(sql: String, timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
+        return channel.send(.command(sql: sql), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.queryExecuted = res else {
                 fatalError("ClickHouse did not confirm query execution")
             }
@@ -121,8 +148,8 @@ public class ClickHouseConnection {
         }
     }
     
-    public func insert(into table: String, data: [ClickHouseColumn]) -> EventLoopFuture<Void> {
-        return channel.send(.insert(table: table, data: data)).map { res in
+    public func insert(into table: String, data: [ClickHouseColumn], timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
+        return channel.send(.insert(table: table, data: data), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.queryExecuted = res else {
                 fatalError("ClickHouse did not confirm data insert")
             }
@@ -138,17 +165,23 @@ public class ClickHouseConnection {
 }
 
 extension Channel {
-    func send(_ command: ClickHouseCommand) -> EventLoopFuture<ClickHouseResult> {
+    func send(_ command: ClickHouseCommand, timeout: TimeAmount) -> EventLoopFuture<ClickHouseResult> {
         let p: EventLoopPromise<ClickHouseResult> = eventLoop.makePromise()
+        let deadline = eventLoop.flatScheduleTask(in: timeout, { () -> EventLoopFuture<Void> in
+            p.fail(ClickHouseError.queryTimeout)
+            return self.close()
+        })
         return writeAndFlush((command, p)).flatMap {
             return p.futureResult.flatMapThrowing { res in
                 // Turn "expected" ClickHouse errors into exceptions
+                deadline.cancel()
                 if case ClickHouseResult.error(let errer) = res {
                     throw errer
                 }
                 return res
             }
         }.flatMapErrorThrowing { error in
+            deadline.cancel()
             p.fail(error)
             throw error
         }

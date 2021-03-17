@@ -68,6 +68,8 @@ enum ClickHouseError: Error {
     case expectedEndOfStream
     case connectionIsNotReadyToSendNewCommands
     case alreadyConnected
+    case readTimeout
+    case queryTimeout
 }
 
 final class ClickHouseChannelHandler: ChannelDuplexHandler {
@@ -86,6 +88,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         case awaitingToSendData(data: [ClickHouseColumn])
         case awaitingPong
         case awaitingQueryConfirmation
+        case closed
     }
     
     var state = State.notConnected
@@ -103,6 +106,12 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         let response = self.unwrapInboundIn(data)
         logger.trace("Received message from clickhouse \(response)")
         
+        if case .closed = state {
+            /// If the channel is closed, irgore any reads even errors.
+            /// This can happen, if a timeout is reached, the channel is closed, but clickhouse server sends an EOF exception
+            return
+        }
+        
         if case .exception(let error) = response {
             state = .ready
             context.fireChannelRead(wrapInboundOut(ClickHouseResult.error(error)))
@@ -110,6 +119,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         }
         
         switch state {
+        case .closed: fallthrough
         case .notConnected:
             context.fireErrorCaught(ClickHouseError.receivedDataButNotConnected)
             
@@ -219,7 +229,6 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
             switch request {
             case .clientConnect(_, _, _):
                 context.fireErrorCaught(ClickHouseError.alreadyConnected)
-                return
                 
             case .query(let sql):
                 logger.debug("Sending query \(sql)")
@@ -246,6 +255,24 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
             
         default:
             context.fireErrorCaught(ClickHouseError.connectionIsNotReadyToSendNewCommands)
+        }
+    }
+    
+    func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        self.state = .closed
+        context.close(mode: mode, promise: promise)
+    }
+    
+    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        if (event as? IdleStateHandler.IdleStateEvent) == .read {
+            if case .ready = state {
+                // If ready, we keep the connection open
+            } else {
+                self.state = .closed
+                self.errorCaught(context: context, error: ClickHouseError.readTimeout)
+            }
+        } else {
+            context.fireUserInboundEventTriggered(event)
         }
     }
 }
