@@ -45,9 +45,11 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
     }
     
     public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String) {
+        assert(type.string == Element.getClickHouseTypeName(fixedLength: type.fixedLength).string)
+        
         buffer.writeClickHouseString(name)
         buffer.writeClickHouseString(type.string)
-        buffer.loadFromClickHouseArray(array: self, fixedLength: type.fixedLength)
+        Element.writeTo(buffer: &buffer, array: self, fixedLength: type.fixedLength)
     }
 }
 
@@ -160,8 +162,18 @@ public indirect enum ClickHouseTypeName {
 public protocol ClickHouseDataType {
     /// Used by ORM to determinte the type of a given array
     static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName
+    
+    static func writeTo(buffer: inout ByteBuffer, array: [Self], fixedLength: Int?)
 }
 extension String: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [String], fixedLength: Int?) {
+        if let length = fixedLength {
+            buffer.writeClickHouseFixedStrings(array, length: length)
+        } else {
+            buffer.writeClickHouseStrings(array)
+        }
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         if let len = fixedLength {
             return .fixedString(len)
@@ -170,107 +182,120 @@ extension String: ClickHouseDataType {
     }
 }
 extension Int8: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Int8], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .int8
     }
 }
 extension Int16: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Int16], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .int16
     }
 }
 extension Int32: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Int32], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .int32
     }
 }
 extension Int64: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Int64], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .int64
     }
 }
 extension UInt8: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [UInt8], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .uint8
     }
 }
 extension UInt16: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [UInt16], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .uint16
     }
 }
 extension UInt32: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [UInt32], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .uint32
     }
 }
 extension UInt64: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [UInt64], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .uint64
     }
 }
 extension Float: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Float], fixedLength: Int?) {
+        let _ = array.withUnsafeBytes {
+            buffer.writeBytes($0)
+        }
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .float
     }
 }
 extension Double: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Double], fixedLength: Int?) {
+        let _ = array.withUnsafeBytes {
+            buffer.writeBytes($0)
+        }
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .float64
     }
 }
 extension UUID: ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [UUID], fixedLength: Int?) {
+        buffer.writeUuidArray(array, endianness: .little)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .uuid
     }
 }
 
-extension Optional: ClickHouseDataType where Wrapped == UInt32 {
+extension Optional: ClickHouseDataType where Wrapped: FixedWidthInteger & ClickHouseDataType {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Optional<Wrapped>], fixedLength: Int?) {
+        buffer.writeIntegerArray(array)
+    }
+    
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
         return .nullable(Wrapped.getClickHouseTypeName(fixedLength: fixedLength))
     }
 }
     
 extension ByteBuffer {
-    mutating func loadFromClickHouseArray<T: ClickHouseDataType>(array: [T], fixedLength: Int?) {
-        if let array = array as? [Int8] {
-            writeIntegerArray(array)
-        } else if let array = array as? [UInt32?] {
-            writeIntegerArray(array)
-        } else if let array = array as? [Int16] {
-            writeIntegerArray(array)
-        } else if let array = array as? [Int32] {
-            writeIntegerArray(array)
-        } else if let array = array as? [Int64] {
-            writeIntegerArray(array)
-        } else if let array = array as? [UInt8] {
-            writeIntegerArray(array)
-        } else if let array = array as? [UInt16] {
-            writeIntegerArray(array)
-        } else if let array = array as? [UInt32] {
-            writeIntegerArray(array)
-        } else if let array = array as? [UInt64] {
-            writeIntegerArray(array)
-        } else if let array = array as? [Float] {
-            let _ = array.withUnsafeBytes {
-                writeBytes($0)
-            }
-        } else if let array = array as? [Double] {
-            let _ = array.withUnsafeBytes {
-                writeBytes($0)
-            }
-        } else if let array = array as? [UUID] {
-            writeUuidArray(array, endianness: .little)
-        } else if let length = fixedLength, let array = array as? [String] {
-            writeClickHouseFixedStrings(array, length: length)
-        } else if let array = array as? [String] {
-            writeClickHouseStrings(array)
-        } else {
-            fatalError("Unkown datatype in addToBuffer")
-        }
-    }
-    
-    
     mutating func toClickHouseArray(type: ClickHouseTypeName, numRows: Int, name: String) -> ClickHouseColumn? {
         switch type {
         case .string:
@@ -355,24 +380,45 @@ extension ByteBuffer {
             case .float64:
                 fatalError("Not supported")
             case .int8:
-                fatalError("Not supported")
+                guard let array: [Int8?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .int16:
-                fatalError("Not supported")
+                guard let array: [Int16?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .int32:
-                fatalError("Not supported")
+                guard let array: [Int32?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .int64:
-                fatalError("Not supported")
+                guard let array: [Int64?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .uint8:
-                fatalError("Not supported")
+                guard let array: [UInt8?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .uint16:
-                fatalError("Not supported")
+                guard let array: [UInt16?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .uint32:
                 guard let array: [UInt32?] = readOptionalIntegerArray(numRows: numRows) else {
                     return nil
                 }
                 return ClickHouseColumn(name, array)
             case .uint64:
-                fatalError("Not supported")
+                guard let array: [UInt64?] = readOptionalIntegerArray(numRows: numRows) else {
+                    return nil
+                }
+                return ClickHouseColumn(name, array)
             case .uuid:
                 fatalError("Not supported")
             case .fixedString(let int):
