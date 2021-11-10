@@ -9,11 +9,11 @@ import Foundation
 import NIO
 
 struct DataColumnWithType {
-    let column: ClickHouseColumnRespresentable
+    let column: ClickHouseColumn
     let type: ClickHouseTypeName
     
     func writeTo(buffer: inout ByteBuffer) {
-        column.writeTo(buffer: &buffer, type: type)
+        column.values.writeTo(buffer: &buffer, type: type, name: column.name)
     }
 }
 

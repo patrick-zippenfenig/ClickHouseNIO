@@ -148,7 +148,7 @@ public class ClickHouseConnection {
         }
     }
     
-    public func insert(into table: String, data: [ClickHouseColumnRespresentable], timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
+    public func insert(into table: String, data: [ClickHouseColumn], timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
         return channel.send(.insert(table: table, data: data), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.queryExecuted = res else {
                 fatalError("ClickHouse did not confirm data insert")

@@ -13,7 +13,7 @@ enum ClickHouseCommand {
     case clientConnect(database: String, user: String, password: String)
     case query(sql: String)
     case command(sql: String)
-    case insert(table: String, data: [ClickHouseColumnRespresentable])
+    case insert(table: String, data: [ClickHouseColumn])
     case ping
 }
 
@@ -27,7 +27,7 @@ enum ClickHouseResult {
 
 
 public struct ClickHouseQueryResult {
-    public let columns: [ClickHouseColumnRespresentable]
+    public let columns: [ClickHouseColumn]
     
     /// ClickHouse transmits multiple DataMessages for each query. Usually the first has all columns, but no data. Here we merge them together.
     fileprivate init(messages: [DataMessage]) {
@@ -91,7 +91,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         case ready
         case awaitingQueryResult(blocks: [DataMessage])
         case awaitingQueryResultEndOfStream(result: ClickHouseQueryResult)
-        case awaitingToSendData(data: [ClickHouseColumnRespresentable])
+        case awaitingToSendData(data: [ClickHouseColumn])
         case awaitingPong
         case awaitingQueryConfirmation
         case closed

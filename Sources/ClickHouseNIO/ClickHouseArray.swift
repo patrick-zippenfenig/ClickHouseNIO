@@ -8,48 +8,50 @@
 import Foundation
 import NIO
 
-public protocol ClickHouseColumnRespresentable {
-    var name: String { get }
-    var count: Int { get }
-    
-    func merge(with: [ClickHouseColumnRespresentable]) throws -> ClickHouseColumnRespresentable
-    
-    /// Write name, type and values to a bytebuffer in clickhouse format
-    func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName)
-}
-
-public struct ClickHouseColumn<T: ClickHouseDataType>: ClickHouseColumnRespresentable {
+public struct ClickHouseColumn {
     public let name: String
-    public let values: [T]
+    public let values: ClickHouseDataTypeArray
     
     public var count: Int { return values.count }
     
-    public init(_ name: String, _ values: [T]) {
+    public init(_ name: String, _ values: ClickHouseDataTypeArray) {
         self.name = name
         self.values = values
     }
     
-    public func merge(with: [ClickHouseColumnRespresentable]) throws -> ClickHouseColumnRespresentable {
-        let sameType = try with.map { anyColumn -> ClickHouseColumn<T> in
-            guard let column = anyColumn as? ClickHouseColumn<T> else {
+    public func merge(with: [ClickHouseColumn]) throws -> ClickHouseColumn {
+        return ClickHouseColumn(name, try values.merge(with: with.map({$0.values})) )
+    }
+}
+
+public protocol ClickHouseDataTypeArray {
+    var count: Int { get }
+    
+    func merge(with: [ClickHouseDataTypeArray]) throws -> ClickHouseDataTypeArray
+    
+    func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String)
+}
+
+
+extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
+    public func merge(with: [ClickHouseDataTypeArray]) throws -> ClickHouseDataTypeArray {
+        let sameType = try with.map { anyArray -> [Element] in
+            guard let column = anyArray as? [Element] else {
                 throw ClickHouseError.invalidDataType
             }
             return column
         }
-        return merge(with: sameType)
+        return ([self] + sameType).flatMap({$0})
     }
     
-    public func merge(with: [ClickHouseColumn<T>]) -> ClickHouseColumn<T> {
-        let values = ([self] + with).flatMap({$0.values})
-        return ClickHouseColumn(self.name, values)
-    }
-    
-    public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName) {
+    public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String) {
         buffer.writeClickHouseString(name)
         buffer.writeClickHouseString(type.string)
-        buffer.loadFromClickHouseArray(array: values, fixedLength: type.fixedLength)
+        buffer.loadFromClickHouseArray(array: self, fixedLength: type.fixedLength)
     }
 }
+
+
 
 public indirect enum ClickHouseTypeName {
     case float
@@ -269,7 +271,7 @@ extension ByteBuffer {
     }
     
     
-    mutating func toClickHouseArray(type: ClickHouseTypeName, numRows: Int, name: String) -> ClickHouseColumnRespresentable? {
+    mutating func toClickHouseArray(type: ClickHouseTypeName, numRows: Int, name: String) -> ClickHouseColumn? {
         switch type {
         case .string:
             guard let strings = readClickHouseStrings(numRows: numRows) else {
