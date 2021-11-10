@@ -259,10 +259,10 @@ final class ClickHouseNIOTests: XCTestCase {
             XCTAssertEqual(id, [nil,nil,UInt32(1),3,4,5,6,7,8,8])
             
             XCTAssertEqual(res.columns[1].name, "str")
-            guard let id = res.columns[1].values as? [String?] else {
+            guard let str = res.columns[1].values as? [String?] else {
                 fatalError("Column `nullable`, was not a Nullable UInt32 array")
             }
-            XCTAssertEqual(id, [nil,nil,"1","3","4","5","6","7","8","8"])
+            XCTAssertEqual(str, [nil,nil,"1","3","4","5","6","7","8","8"])
         }.wait()
     }
 }
