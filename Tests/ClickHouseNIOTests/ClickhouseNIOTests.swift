@@ -22,6 +22,7 @@ class TestConnection {
         // openssl req -subj "/CN=my.host.name" -days 365 -nodes -new -x509 -keyout /etc/clickhouse-server/server.key -out /etc/clickhouse-server/server.crt
         // openssl dhparam -out /etc/clickhouse-server/dhparam.pem 1024 // NOTE use 4096 in prod
         // chown -R clickhouse:clickhouse /etc/clickhouse-server/
+        // Port 9440 = secure tcp, 9000 regular tcp
         let socket = try! SocketAddress(ipAddress: ip, port: 9440)
         let tls = TLSConfiguration.forClient(certificateVerification: .none)
         let config = ClickHouseConfiguration(
@@ -193,7 +194,8 @@ final class ClickHouseNIOTests: XCTestCase {
                 timestamp Int64,
                 value Float32,
                 varstring String,
-                fixstring FixedString(2)
+                fixstring FixedString(2),
+                nullable Nullable(UInt32)
             )
             ENGINE = MergeTree() PRIMARY KEY stationid ORDER BY stationid
             """
@@ -205,12 +207,62 @@ final class ClickHouseNIOTests: XCTestCase {
             ClickHouseColumn("timestamp", (0..<count).map{Int64($0)}),
             ClickHouseColumn("value", (0..<count).map{Float($0)}),
             ClickHouseColumn("varstring", (0..<count).map{"\($0)"}),
-            ClickHouseColumn("fixstring", (0..<count).map{"\($0)"})
+            ClickHouseColumn("fixstring", (0..<count).map{"\($0)"}),
+            ClickHouseColumn("nullable", (0..<count).map{ $0 < 0 ? nil : UInt32($0)})
         ]
         
         try! conn.connection.insert(into: "test", data: data).wait()
         
         // insert again, but this time via a select from the database
         try! conn.connection.command(sql: "Insert into test Select * from test").wait()
+    }
+    
+    
+    func testNullable() {
+        try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
+        
+        let sql = """
+            CREATE TABLE test
+            (
+            id Int32,
+            nullable Nullable(UInt32),
+            str Nullable(String)
+            )
+            ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
+            """
+        try! conn.connection.command(sql: sql).wait()
+        let data = [
+            ClickHouseColumn("id", [Int32(1),2,3,3,4,5,6,7,8,9]),
+            ClickHouseColumn("nullable", [nil,nil,UInt32(1),3,4,5,6,7,8,8]),
+            ClickHouseColumn("str", [nil,nil,"1","3","4","5","6","7","8","8"])
+        ]
+        
+        try! conn.connection.insert(into: "test", data: data).wait()
+        
+        print("send complete")
+        
+        try! conn.connection.query(sql: "SELECT nullable.null FROM test").map { res in
+            //print(res)
+            guard let null = res.columns[0].values as? [UInt8?] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(null, [1,1,0,0,0,0,0,0,0,0])
+        }.wait()
+        
+        try! conn.connection.query(sql: "SELECT nullable, str FROM test").map { res in
+            //print(res)
+            XCTAssertEqual(res.columns.count, 2)
+            XCTAssertEqual(res.columns[0].name, "nullable")
+            guard let id = res.columns[0].values as? [UInt32?] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(id, [nil,nil,UInt32(1),3,4,5,6,7,8,8])
+            
+            XCTAssertEqual(res.columns[1].name, "str")
+            guard let str = res.columns[1].values as? [String?] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(str, [nil,nil,"1","3","4","5","6","7","8","8"])
+        }.wait()
     }
 }

@@ -15,7 +15,7 @@ final class ClickHouseMessageEncoder: MessageToByteEncoder {
     enum Command {
         case clientConnect(database: String, user: String, password: String)
         case query(sql: String, revision: UInt64)
-        case data(data: [(column: String, values: [ClickHouseDataType], type: ClickHouseTypeName)], revision: UInt64)
+        case data(data: [DataColumnWithType], revision: UInt64)
         case ping
     }
     

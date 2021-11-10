@@ -8,6 +8,15 @@
 import Foundation
 import NIO
 
+struct DataColumnWithType {
+    let column: ClickHouseColumn
+    let type: ClickHouseTypeName
+    
+    func writeTo(buffer: inout ByteBuffer) {
+        column.values.writeTo(buffer: &buffer, type: type, name: column.name)
+    }
+}
+
 struct DataMessage {
     let table_name: String?
     
@@ -21,7 +30,7 @@ struct DataMessage {
      */
     let bucket_num: Int32
     
-    let columns: [(column: String, values: [ClickHouseDataType], type: ClickHouseTypeName)]
+    let columns: [DataColumnWithType]
     
     var columnCount: Int {
         return columns.count
@@ -29,10 +38,10 @@ struct DataMessage {
     
     /// Get the number of rows
     var rowCount: Int {
-        return columns.first?.values.count ?? 0
+        return columns.first?.column.count ?? 0
     }
     
-    public init(is_overflows : UInt8 = 0, bucket_num : Int32 = -1, columns: [(column: String, values: [ClickHouseDataType], type: ClickHouseTypeName)] = []) {
+    public init(is_overflows : UInt8 = 0, bucket_num : Int32 = -1, columns: [DataColumnWithType] = []) {
         self.is_overflows = is_overflows
         self.bucket_num = bucket_num
         self.columns = columns
@@ -84,7 +93,7 @@ struct DataMessage {
         }
         //print("numColumns \(numColumns) numRows \(numRows)")
         
-        var columns = [(column: String, values: [ClickHouseDataType], type: ClickHouseTypeName)]()
+        var columns = [DataColumnWithType]()
         columns.reserveCapacity(Int(numColumns))
         for _ in 0..<numColumns {
             guard let name = buffer.readClickHouseString(),
@@ -94,19 +103,20 @@ struct DataMessage {
             guard let typeEnum = ClickHouseTypeName(type) else {
                 fatalError("Unknown type \(type)")
             }
-            guard let array = buffer.toClickHouseArray(type: typeEnum, numRows: Int(numRows)) else {
+            guard let values = typeEnum.primitiveType.readFrom(buffer: &buffer, numRows: Int(numRows), fixedLength: typeEnum.fixedLength) else {
                 return nil // need more data
             }
             //print("Column: \(name), Type: \(type)")
-            columns.append((name, array, typeEnum))
+            let column = ClickHouseColumn(name, values)
+            columns.append(DataColumnWithType(column: column, type: typeEnum))
         }
         self.columns = columns
     }
     
     func addToBuffer(buffer : inout ByteBuffer, revision : UInt64) {
-        let rows = self.columns.first?.values.count ?? 0
-        for (_, column, _) in self.columns {
-            assert(rows == column.count, "addToBuffer wrong column count")
+        let rows = self.columns.first?.column.count ?? 0
+        for c in self.columns {
+            assert(rows == c.column.count, "addToBuffer wrong column count")
         }
         buffer.writeVarInt64(ClientCodes.Data.rawValue)
         
@@ -126,10 +136,8 @@ struct DataMessage {
         buffer.writeVarInt64(UInt64(rows))
         
         // TODO the required buffer space might be very high... consider to stream one column after another
-        for (column, values, type) in self.columns {
-            buffer.writeClickHouseString(column)
-            buffer.writeClickHouseString(type.string)
-            buffer.loadFromClickHouseArray(array: values, fixedLength: type.fixedLength)
+        for c in self.columns {
+            c.writeTo(buffer: &buffer)
         }
     }
 }

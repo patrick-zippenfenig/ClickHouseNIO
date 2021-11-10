@@ -145,6 +145,34 @@ extension ByteBuffer {
         return array
     }
     
+    mutating func readOptionalIntegerArray<T: FixedWidthInteger>(numRows: Int) -> [T?]? {
+        guard readableBytes >= (MemoryLayout<T>.size+1) * numRows else {
+            return nil
+        }
+        var isnull = [Bool]()
+        isnull.reserveCapacity(numRows)
+        for _ in 0..<numRows {
+            guard let set: UInt8 = readInteger(endianness: .little) else {
+                return nil
+            }
+            isnull.append(set == 1)
+        }
+        
+        var array = [T?]()
+        array.reserveCapacity(numRows)
+        for i in 0..<numRows {
+            guard let value: T = readInteger(endianness: .little) else {
+                return nil
+            }
+            if isnull[i] {
+                array.append(nil)
+            } else {
+                array.append(value)
+            }
+        }
+        return array
+    }
+    
     mutating func readUuidArray(numRows: Int, endianness: Endianness = .big) -> [UUID]? {
         guard readableBytes >= MemoryLayout<UUID>.size * numRows else {
             return nil
@@ -171,8 +199,10 @@ extension ByteBuffer {
             return nil
         }
         return [T](unsafeUninitializedCapacity: numRows) { (buffer, initializedCount) in
-            let numBytes = readableBytesView.withUnsafeBytes({ $0.copyBytes(to: buffer)})
-            assert(numBytes / MemoryLayout<T>.size == numRows)
+            let numBytes = readableBytesView.withUnsafeBytes({
+                $0[0..<MemoryLayout<T>.size * numRows].copyBytes(to: buffer)
+            })
+            assert(numBytes == MemoryLayout<T>.size * numRows)
             moveReaderIndex(forwardBy: numBytes)
             initializedCount = numRows
         }
@@ -182,6 +212,25 @@ extension ByteBuffer {
         reserveCapacity(array.count * MemoryLayout<T>.size + writableBytes)
         for element in array {
             writeInteger(element, endianness: .little)
+        }
+    }
+    
+    mutating func writeOptionalIntegerArray<T: FixedWidthInteger>(_ array: [T?]) {
+        reserveCapacity(array.count * (MemoryLayout<T>.size + 1) + writableBytes)
+        // Frist write one array with 0/1 for nullable, then data
+        for element in array {
+            if element == nil {
+                writeInteger(UInt8(1), endianness: .little)
+            } else {
+                writeInteger(UInt8(0), endianness: .little)
+            }
+        }
+        for element in array {
+            if let element = element {
+                writeInteger(element, endianness: .little)
+            } else {
+                writeInteger(T.zero, endianness: .little)
+            }
         }
     }
     
@@ -199,8 +248,6 @@ extension ByteBuffer {
                     writeBytes($0)
                 }
             }
-            
-
         }
     }
 }
