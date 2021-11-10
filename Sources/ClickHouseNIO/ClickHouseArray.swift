@@ -478,7 +478,7 @@ extension UUID: ClickHouseDataType {
     }
     
     public static var clickhouseDefault: UUID {
-        return .init(uuidString: "00000000-0000-0000-0000-000000000000")!
+        return UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     }
     
     public static func writeTo(buffer: inout ByteBuffer, array: [UUID], fixedLength: Int?) {
