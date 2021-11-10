@@ -367,7 +367,7 @@ extension ByteBuffer {
             case .uint16:
                 fatalError("Not supported")
             case .uint32:
-                guard let array: [UInt32?] = readIntegerArray(numRows: numRows) else {
+                guard let array: [UInt32?] = readOptionalIntegerArray(numRows: numRows) else {
                     return nil
                 }
                 return ClickHouseColumn(name, array)

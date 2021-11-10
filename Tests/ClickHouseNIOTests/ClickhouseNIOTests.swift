@@ -231,20 +231,30 @@ final class ClickHouseNIOTests: XCTestCase {
             """
         try! conn.connection.command(sql: sql).wait()
         let data = [
-            ClickHouseColumn("id", [Int32(1), 2, 3]),
-            ClickHouseColumn("nullable", [UInt32(5), 1, nil])
+            ClickHouseColumn("id", [Int32(1),2,3,3,4,5,6,7,8,9]),
+            ClickHouseColumn("nullable", [nil,nil,UInt32(1),3,4,5,6,7,8,8])
         ]
         
         try! conn.connection.insert(into: "test", data: data).wait()
         
-        try! conn.connection.query(sql: "SELECT * FROM test").map { res in
-            print(res)
-            XCTAssertEqual(res.columns.count, 2)
-            XCTAssertEqual(res.columns[1].name, "nullable")
-            guard let id = res.columns[1].values as? [UInt32?] else {
+        print("send complete")
+        
+        try! conn.connection.query(sql: "SELECT nullable.null FROM test").map { res in
+            //print(res)
+            guard let null = res.columns[0].values as? [UInt8?] else {
                 fatalError("Column `nullable`, was not a Nullable UInt32 array")
             }
-            XCTAssertEqual(id, [UInt32(5), 1, 0])
+            XCTAssertEqual(null, [1,1,0,0,0,0,0,0,0,0])
+        }.wait()
+        
+        try! conn.connection.query(sql: "SELECT nullable FROM test").map { res in
+            //print(res)
+            XCTAssertEqual(res.columns.count, 1)
+            XCTAssertEqual(res.columns[0].name, "nullable")
+            guard let id = res.columns[0].values as? [UInt32?] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(id, [nil,nil,UInt32(1),3,4,5,6,7,8,8])
         }.wait()
     }
 }
