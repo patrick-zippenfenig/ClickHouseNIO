@@ -45,8 +45,6 @@ public struct ClickHouseColumn<T: ClickHouseDataType>: ClickHouseColumnRespresen
     }
     
     public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName) {
-        <#code#>
-        
         buffer.writeClickHouseString(name)
         buffer.writeClickHouseString(type.string)
         buffer.loadFromClickHouseArray(array: values, fixedLength: type.fixedLength)
@@ -68,15 +66,6 @@ public indirect enum ClickHouseTypeName {
     case fixedString(Int)
     case string
     case nullable(ClickHouseTypeName)
-    
-    /// Return nil it byte buffer has to read more data
-    func convertFrom(buffer: inout ByteBuffer, name: String, numRows: Int) -> ClickHouseColumnRespresentable? {
-        guard let array = buffer.toClickHouseArray(type: self, numRows: Int(numRows)) else {
-            return nil // need more data
-        }
-        //print("Column: \(name), Type: \(type)")
-        let column = ClickHouseColumn(<#T##name: String##String#>, <#T##values: [_]##[_]#>)
-    }
     
     public init?(_ type: String) {
         if type.starts(with: "Nullable(") {
@@ -241,7 +230,7 @@ extension Optional: ClickHouseDataType where Wrapped == UInt32 {
 }
     
 extension ByteBuffer {
-    mutating func loadFromClickHouseArray(array: [ClickHouseDataType], fixedLength: Int?) {
+    mutating func loadFromClickHouseArray<T: ClickHouseDataType>(array: [T], fixedLength: Int?) {
         if let array = array as? [Int8] {
             writeIntegerArray(array)
         } else if let array = array as? [UInt32?] {
@@ -280,43 +269,43 @@ extension ByteBuffer {
     }
     
     
-    mutating func toClickHouseArray(type: ClickHouseTypeName, numRows: Int) -> [ClickHouseDataType]? {
+    mutating func toClickHouseArray(type: ClickHouseTypeName, numRows: Int, name: String) -> ClickHouseColumnRespresentable? {
         switch type {
         case .string:
             guard let strings = readClickHouseStrings(numRows: numRows) else {
                 return nil
             }
-            return strings
+            return ClickHouseColumn(name, strings)
         case .int64:
             guard let array: [Int64] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .int32:
             guard let array: [Int32] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .uint64:
             guard let array: [UInt64] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .uint8:
             guard let array: [UInt8] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .float:
             guard let array: [Float] = readUnsafeGenericArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .uuid:
             guard let array = readUuidArray(numRows: numRows, endianness: .little) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .fixedString(let fixedStringLength):
             var strings = [String]()
             strings.reserveCapacity(numRows)
@@ -331,32 +320,32 @@ extension ByteBuffer {
                     strings.append(str)
                 }
             }
-            return strings
+            return ClickHouseColumn(name, strings)
         case .float64:
             guard let array: [Double] = readUnsafeGenericArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .int8:
             guard let array: [Int8] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .int16:
             guard let array: [Int16] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .uint16:
             guard let array: [UInt16] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .uint32:
             guard let array: [UInt32] = readIntegerArray(numRows: numRows) else {
                 return nil
             }
-            return array
+            return ClickHouseColumn(name, array)
         case .nullable(let subtype):
             switch subtype {
             case .float:
@@ -379,7 +368,7 @@ extension ByteBuffer {
                 guard let array: [UInt32?] = readIntegerArray(numRows: numRows) else {
                     return nil
                 }
-                return array
+                return ClickHouseColumn(name, array)
             case .uint64:
                 fatalError("Not supported")
             case .uuid:

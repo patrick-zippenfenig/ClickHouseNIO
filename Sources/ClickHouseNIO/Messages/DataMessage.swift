@@ -11,6 +11,10 @@ import NIO
 struct DataColumnWithType {
     let column: ClickHouseColumnRespresentable
     let type: ClickHouseTypeName
+    
+    func writeTo(buffer: inout ByteBuffer) {
+        column.writeTo(buffer: &buffer, type: type)
+    }
 }
 
 struct DataMessage {
@@ -99,7 +103,7 @@ struct DataMessage {
             guard let typeEnum = ClickHouseTypeName(type) else {
                 fatalError("Unknown type \(type)")
             }
-            guard let column = typeEnum.convertFrom(buffer: &buffer, name: name, numRows: Int(numRows)) else {
+            guard let column = buffer.toClickHouseArray(type: typeEnum, numRows: Int(numRows), name: name) else {
                 return nil // need more data
             }
             //print("Column: \(name), Type: \(type)")
@@ -132,7 +136,7 @@ struct DataMessage {
         
         // TODO the required buffer space might be very high... consider to stream one column after another
         for c in self.columns {
-            c.column.writeTo(buffer: &buffer, type: c.type)
+            c.writeTo(buffer: &buffer)
         }
     }
 }
