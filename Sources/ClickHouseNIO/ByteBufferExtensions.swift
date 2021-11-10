@@ -185,6 +185,18 @@ extension ByteBuffer {
         }
     }
     
+    mutating func writeIntegerArray<T: FixedWidthInteger>(_ array: [T?]) {
+        reserveCapacity(array.count * MemoryLayout<T>.size + writableBytes)
+        for element in array {
+            if let element = element {
+                writeInteger(Int8(1), endianness: .little)
+                writeInteger(element, endianness: .little)
+            } else {
+                writeInteger(Int8(0), endianness: .little)
+            }
+        }
+    }
+    
     /// Write UUID array for clickhouse
     mutating func writeUuidArray(_ array: [UUID], endianness: Endianness = .big) {
         reserveCapacity(array.count * MemoryLayout<UUID>.size + writableBytes)
@@ -199,8 +211,6 @@ extension ByteBuffer {
                     writeBytes($0)
                 }
             }
-            
-
         }
     }
 }

@@ -13,7 +13,7 @@ enum ClickHouseCommand {
     case clientConnect(database: String, user: String, password: String)
     case query(sql: String)
     case command(sql: String)
-    case insert(table: String, data: [ClickHouseColumn])
+    case insert(table: String, data: [ClickHouseColumnRespresentable])
     case ping
 }
 
@@ -27,7 +27,7 @@ enum ClickHouseResult {
 
 
 public struct ClickHouseQueryResult {
-    public let columns: [ClickHouseColumn]
+    public let columns: [ClickHouseColumnRespresentable]
     
     /// ClickHouse transmits multiple DataMessages for each query. Usually the first has all columns, but no data. Here we merge them together.
     fileprivate init(messages: [DataMessage]) {
@@ -41,17 +41,22 @@ public struct ClickHouseQueryResult {
         
         /// Commands like drop table, only return one message with the tables
         if messages.count == 1 {
-            columns = messages[0].columns.map { ClickHouseColumn($0.column, $0.values) }
+            columns = messages[0].columns.map { $0.column }
             return
         }
         
         /// If we only have 2 messages and the first has no data,, we can return the same array
-        if messages.count == 2 && messages[0].rowCount == 0{
-            columns = messages[1].columns.map { ClickHouseColumn($0.column, $0.values) }
+        if messages.count == 2 && messages[0].rowCount == 0 {
+            columns = messages[1].columns.map { $0.column }
             return
         }
         columns = (0..<messages[0].columnCount).map { i in
-            return ClickHouseColumn(messages[0].columns[i].column, messages.flatMap({$0.columns[i].values}))
+            let c = messages.map { $0.columns[i].column }
+            guard let first = c.first else {
+                fatalError()
+            }
+            // only fails on merging different types
+            return try! first.merge(with: Array(c.dropFirst()))
         }
     }
 }
@@ -70,6 +75,7 @@ enum ClickHouseError: Error {
     case alreadyConnected
     case readTimeout
     case queryTimeout
+    case invalidDataType
 }
 
 final class ClickHouseChannelHandler: ChannelDuplexHandler {
@@ -85,7 +91,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
         case ready
         case awaitingQueryResult(blocks: [DataMessage])
         case awaitingQueryResultEndOfStream(result: ClickHouseQueryResult)
-        case awaitingToSendData(data: [ClickHouseColumn])
+        case awaitingToSendData(data: [ClickHouseColumnRespresentable])
         case awaitingPong
         case awaitingQueryConfirmation
         case closed
@@ -172,9 +178,9 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
                 fatalError()
             }
             precondition(responseData.columns.count == data.count, "Number of columns wrong")
-            let dataWithType = zip(data, responseData.columns).map { (data, ch) -> (column: String, values: [ClickHouseDataType], type: ClickHouseTypeName) in
-                precondition(data.name == ch.column, "Column names wrong")
-                return (column: data.name, values: data.values, type: ch.type)
+            let dataWithType = zip(data, responseData.columns).map { (data, ch) -> DataColumnWithType in
+                precondition(data.name == ch.column.name, "Column names wrong")
+                return DataColumnWithType(column: ch.column, type: ch.type)
             }
             context.writeAndFlush(wrapOutboundOut(.data(data: dataWithType, revision: revision)), promise: nil)
             state = .awaitingQueryConfirmation
