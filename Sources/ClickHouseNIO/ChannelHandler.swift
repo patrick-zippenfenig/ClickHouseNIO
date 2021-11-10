@@ -180,7 +180,7 @@ final class ClickHouseChannelHandler: ChannelDuplexHandler {
             precondition(responseData.columns.count == data.count, "Number of columns wrong")
             let dataWithType = zip(data, responseData.columns).map { (data, ch) -> DataColumnWithType in
                 precondition(data.name == ch.column.name, "Column names wrong")
-                return DataColumnWithType(column: ch.column, type: ch.type)
+                return DataColumnWithType(column: data, type: ch.type)
             }
             context.writeAndFlush(wrapOutboundOut(.data(data: dataWithType, revision: revision)), promise: nil)
             state = .awaitingQueryConfirmation

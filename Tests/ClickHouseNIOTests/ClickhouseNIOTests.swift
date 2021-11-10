@@ -230,10 +230,9 @@ final class ClickHouseNIOTests: XCTestCase {
             ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
             """
         try! conn.connection.command(sql: sql).wait()
-        let ids = [Int32(1), 2, 3]
         let data = [
-            ClickHouseColumn("id", ids),
-            ClickHouseColumn("nullable", [UInt32(5), 1, 0])
+            ClickHouseColumn("id", [Int32(1), 2, 3]),
+            ClickHouseColumn("nullable", [UInt32(5), 1, nil])
         ]
         
         try! conn.connection.insert(into: "test", data: data).wait()
