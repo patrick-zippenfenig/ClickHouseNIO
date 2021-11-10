@@ -171,8 +171,10 @@ extension ByteBuffer {
             return nil
         }
         return [T](unsafeUninitializedCapacity: numRows) { (buffer, initializedCount) in
-            let numBytes = readableBytesView.withUnsafeBytes({ $0.copyBytes(to: buffer)})
-            assert(numBytes / MemoryLayout<T>.size == numRows)
+            let numBytes = readableBytesView.withUnsafeBytes({
+                $0[0..<MemoryLayout<T>.size * numRows].copyBytes(to: buffer)
+            })
+            assert(numBytes == MemoryLayout<T>.size * numRows)
             moveReaderIndex(forwardBy: numBytes)
             initializedCount = numRows
         }
@@ -193,6 +195,7 @@ extension ByteBuffer {
                 writeInteger(element, endianness: .little)
             } else {
                 writeInteger(Int8(0), endianness: .little)
+                writeInteger(UInt32(0), endianness: .little)
             }
         }
     }
