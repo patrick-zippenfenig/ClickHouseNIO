@@ -215,7 +215,7 @@ extension ByteBuffer {
         }
     }
     
-    mutating func writeIntegerArray<T: FixedWidthInteger>(_ array: [T?]) {
+    mutating func writeOptionalIntegerArray<T: FixedWidthInteger>(_ array: [T?]) {
         reserveCapacity(array.count * (MemoryLayout<T>.size + 1) + writableBytes)
         // Frist write one array with 0/1 for nullable, then data
         for element in array {

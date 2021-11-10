@@ -225,14 +225,16 @@ final class ClickHouseNIOTests: XCTestCase {
             CREATE TABLE test
             (
             id Int32,
-            nullable Nullable(UInt32)
+            nullable Nullable(UInt32),
+            str Nullable(String)
             )
             ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
             """
         try! conn.connection.command(sql: sql).wait()
         let data = [
             ClickHouseColumn("id", [Int32(1),2,3,3,4,5,6,7,8,9]),
-            ClickHouseColumn("nullable", [nil,nil,UInt32(1),3,4,5,6,7,8,8])
+            ClickHouseColumn("nullable", [nil,nil,UInt32(1),3,4,5,6,7,8,8]),
+            ClickHouseColumn("str", [nil,nil,"1","3","4","5","6","7","8","8"])
         ]
         
         try! conn.connection.insert(into: "test", data: data).wait()
@@ -247,14 +249,20 @@ final class ClickHouseNIOTests: XCTestCase {
             XCTAssertEqual(null, [1,1,0,0,0,0,0,0,0,0])
         }.wait()
         
-        try! conn.connection.query(sql: "SELECT nullable FROM test").map { res in
+        try! conn.connection.query(sql: "SELECT nullable, str FROM test").map { res in
             //print(res)
-            XCTAssertEqual(res.columns.count, 1)
+            XCTAssertEqual(res.columns.count, 21)
             XCTAssertEqual(res.columns[0].name, "nullable")
             guard let id = res.columns[0].values as? [UInt32?] else {
                 fatalError("Column `nullable`, was not a Nullable UInt32 array")
             }
             XCTAssertEqual(id, [nil,nil,UInt32(1),3,4,5,6,7,8,8])
+            
+            XCTAssertEqual(res.columns[1].name, "str")
+            guard let id = res.columns[1].values as? [String?] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(id, [nil,nil,"1","3","4","5","6","7","8","8"])
         }.wait()
     }
 }

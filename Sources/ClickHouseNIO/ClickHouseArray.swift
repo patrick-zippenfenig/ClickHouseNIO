@@ -164,8 +164,20 @@ public protocol ClickHouseDataType {
     static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName
     
     static func writeTo(buffer: inout ByteBuffer, array: [Self], fixedLength: Int?)
+    
+    // return nil for more data. Movd buffer forward if sucessfull
+    //func clickhouseReadValue(buffer: inout ByteBuffer, fixedLength: Int?) -> Self?
+    
+    /// Size in byte required for an array of this type
+    static func clickhouseByteSize(numRows: Int, fixedLength: Int?) -> Int
+    
+    //static var clickhouseDefault: Self { get }
 }
 extension String: ClickHouseDataType {
+    public static var clickhouseDefault: String {
+        return ""
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [String], fixedLength: Int?) {
         if let length = fixedLength {
             buffer.writeClickHouseFixedStrings(array, length: length)
@@ -182,6 +194,10 @@ extension String: ClickHouseDataType {
     }
 }
 extension Int8: ClickHouseDataType {
+    public static var clickhouseDefault: Int8 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Int8], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -191,6 +207,10 @@ extension Int8: ClickHouseDataType {
     }
 }
 extension Int16: ClickHouseDataType {
+    public static var clickhouseDefault: Int16 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Int16], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -200,6 +220,10 @@ extension Int16: ClickHouseDataType {
     }
 }
 extension Int32: ClickHouseDataType {
+    public static var clickhouseDefault: Int32 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Int32], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -209,6 +233,10 @@ extension Int32: ClickHouseDataType {
     }
 }
 extension Int64: ClickHouseDataType {
+    public static var clickhouseDefault: Int64 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Int64], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -218,6 +246,10 @@ extension Int64: ClickHouseDataType {
     }
 }
 extension UInt8: ClickHouseDataType {
+    public static var clickhouseDefault: UInt8 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [UInt8], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -227,6 +259,10 @@ extension UInt8: ClickHouseDataType {
     }
 }
 extension UInt16: ClickHouseDataType {
+    public static var clickhouseDefault: UInt16 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [UInt16], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -236,6 +272,10 @@ extension UInt16: ClickHouseDataType {
     }
 }
 extension UInt32: ClickHouseDataType {
+    public static var clickhouseDefault: UInt32 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [UInt32], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -245,6 +285,10 @@ extension UInt32: ClickHouseDataType {
     }
 }
 extension UInt64: ClickHouseDataType {
+    public static var clickhouseDefault: UInt64 {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [UInt64], fixedLength: Int?) {
         buffer.writeIntegerArray(array)
     }
@@ -254,6 +298,10 @@ extension UInt64: ClickHouseDataType {
     }
 }
 extension Float: ClickHouseDataType {
+    public static var clickhouseDefault: Float {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Float], fixedLength: Int?) {
         let _ = array.withUnsafeBytes {
             buffer.writeBytes($0)
@@ -265,6 +313,10 @@ extension Float: ClickHouseDataType {
     }
 }
 extension Double: ClickHouseDataType {
+    public static var clickhouseDefault: Double {
+        return 0
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Double], fixedLength: Int?) {
         let _ = array.withUnsafeBytes {
             buffer.writeBytes($0)
@@ -276,6 +328,10 @@ extension Double: ClickHouseDataType {
     }
 }
 extension UUID: ClickHouseDataType {
+    public static var clickhouseDefault: UUID {
+        return .init(uuidString: "00000000-0000-0000-0000-000000000000")!
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [UUID], fixedLength: Int?) {
         buffer.writeUuidArray(array, endianness: .little)
     }
@@ -285,9 +341,28 @@ extension UUID: ClickHouseDataType {
     }
 }
 
-extension Optional: ClickHouseDataType where Wrapped: FixedWidthInteger & ClickHouseDataType {
+extension Optional: ClickHouseDataType where Wrapped: ClickHouseDataType {
+    public static var clickhouseDefault: Optional<Wrapped> {
+        fatalError()
+    }
+    
     public static func writeTo(buffer: inout ByteBuffer, array: [Optional<Wrapped>], fixedLength: Int?) {
-        buffer.writeIntegerArray(array)
+        buffer.reserveCapacity(array.count * (1) + buffer.writableBytes)
+        // Frist write one array with 0/1 for nullable, then data
+        for element in array {
+            if element == nil {
+                buffer.writeInteger(UInt8(1), endianness: .little)
+            } else {
+                buffer.writeInteger(UInt8(0), endianness: .little)
+            }
+        }
+        let mapped: [Wrapped] = array.map {
+            guard let value = $0 else {
+                return Wrapped.clickhouseDefault
+            }
+            return value
+        }
+        Wrapped.writeTo(buffer: &buffer, array: mapped, fixedLength: fixedLength)
     }
     
     public static func getClickHouseTypeName(fixedLength: Int?) -> ClickHouseTypeName {
@@ -374,6 +449,26 @@ extension ByteBuffer {
             }
             return ClickHouseColumn(name, array)
         case .nullable(let subtype):
+            
+            var bufferCopy = self
+            
+            guard bufferCopy.readableBytes >= (1) * numRows else {
+                return nil
+            }
+            var isnull = [Bool]()
+            isnull.reserveCapacity(numRows)
+            for _ in 0..<numRows {
+                guard let set: UInt8 = bufferCopy.readInteger(endianness: .little) else {
+                    return nil // need more data
+                }
+                isnull.append(set == 1)
+            }
+            
+            guard let data = bufferCopy.toClickHouseArray(type: subtype, numRows: numRows, name: name) else {
+                return nil // need more data
+            }
+            data.values
+            
             switch subtype {
             case .float:
                 fatalError("Not supported")
@@ -421,11 +516,11 @@ extension ByteBuffer {
                 return ClickHouseColumn(name, array)
             case .uuid:
                 fatalError("Not supported")
-            case .fixedString(let int):
+            case .fixedString(_):
                 fatalError("Not supported")
             case .string:
                 fatalError("Not supported")
-            case .nullable(let clickHouseTypeName):
+            case .nullable(_):
                 fatalError("Not supported")
             }
         }
