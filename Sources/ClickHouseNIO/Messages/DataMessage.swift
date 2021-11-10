@@ -103,10 +103,11 @@ struct DataMessage {
             guard let typeEnum = ClickHouseTypeName(type) else {
                 fatalError("Unknown type \(type)")
             }
-            guard let column = buffer.toClickHouseArray(type: typeEnum, numRows: Int(numRows), name: name) else {
+            guard let values = typeEnum.primitiveType.readFrom(buffer: &buffer, numRows: Int(numRows), fixedLength: typeEnum.fixedLength) else {
                 return nil // need more data
             }
             //print("Column: \(name), Type: \(type)")
+            let column = ClickHouseColumn(name, values)
             columns.append(DataColumnWithType(column: column, type: typeEnum))
         }
         self.columns = columns

@@ -251,7 +251,7 @@ final class ClickHouseNIOTests: XCTestCase {
         
         try! conn.connection.query(sql: "SELECT nullable, str FROM test").map { res in
             //print(res)
-            XCTAssertEqual(res.columns.count, 21)
+            XCTAssertEqual(res.columns.count, 2)
             XCTAssertEqual(res.columns[0].name, "nullable")
             guard let id = res.columns[0].values as? [UInt32?] else {
                 fatalError("Column `nullable`, was not a Nullable UInt32 array")
