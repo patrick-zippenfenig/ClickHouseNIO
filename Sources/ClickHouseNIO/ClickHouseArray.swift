@@ -445,27 +445,27 @@ public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible {
             return nil
         }
         return a.map {
-            .init(_date:
+            .init(date:
                 Date(timeIntervalSince1970: Double(24 * 3600 * Int($0)))
             )
         }
     }
 
     public init(_ exact: Date) {
-        self._date = exact
+        self.date = exact
     }
 
-    init(_date: Date) {
-        self._date = _date
+    init(date: Date) {
+        self.date = date
     }
 
     public static var clickhouseDefault: ClickHouseDate32 {
-        return .init(_date: .init(timeIntervalSince1970: 0))
+        return .init(date: .init(timeIntervalSince1970: 0))
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDate32], fixedLength: ClickHouseColumnMetadata?) {
         let a = array.map {
-            Int32($0._date.timeIntervalSince1970 / (24 * 3600))
+            Int32($0.date.timeIntervalSince1970 / (24 * 3600))
         }
         buffer.writeIntegerArray(a)
     }
@@ -474,10 +474,10 @@ public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible {
         return .date32
     }
 
-    public var _date: Date
+    public var date: Date
 
     public var description: String {
-        "\(_date)"
+        "\(date)"
     }
 }
 
@@ -497,30 +497,30 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDate], fixedLength: ClickHouseColumnMetadata?) {
         let a: [UInt16] = array.map {
-            UInt16($0._date.timeIntervalSince1970 / (24 * 3600))
+            UInt16($0.date.timeIntervalSince1970 / (24 * 3600))
         }
         buffer.writeIntegerArray(a)
     }
 
     public init?(flooring: Date) {
-        guard let _date = Calendar.current.date(bySettingHour: 0, minute: 0, second: 0, of: flooring) else {
+        guard let date = Calendar.current.date(bySettingHour: 0, minute: 0, second: 0, of: flooring) else {
             return nil
         }
-        self._date = _date
+        self.date = date
     }
 
     public init(_ exact: Date) {
-        self._date = exact
+        self.date = exact
     }
 
     public static func getClickHouseTypeName(fixedLength: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
         return .date
     }
 
-    public var _date: Date
+    public var date: Date
 
     public var description: String {
-        "\(_date)"
+        "\(date)"
     }
 }
 public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible {
@@ -531,7 +531,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
         let hm: [Int64]? = buffer.readUnsafeGenericArray(numRows: numRows)
         return hm?.map {
             .init(
-                _date: .init(timeIntervalSince1970: Double($0) / pow(
+                date: .init(timeIntervalSince1970: Double($0) / pow(
                         10.0, Double(precision)
                     )
                 )
@@ -540,7 +540,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
     }
 
     public static var clickhouseDefault: ClickHouseDateTime64 {
-        return .init(_date: .init(timeIntervalSince1970: 0))
+        return .init(date: .init(timeIntervalSince1970: 0))
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime64], fixedLength: ClickHouseColumnMetadata?) {
@@ -548,7 +548,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
             fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(timezone)")
         }
         let hm = array.map({
-            Int64($0._date.timeIntervalSince1970 * pow(10.0, Double(precision)))
+            Int64($0.date.timeIntervalSince1970 * pow(10.0, Double(precision)))
         })
         let _ = hm.withUnsafeBytes {
             buffer.writeBytes($0)
@@ -559,18 +559,18 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
         return .dateTime64(fixedLength!)
     }
 
-    public var _date: Date
+    public var date: Date
 
     public init(_ exact: Date) {
-        self._date = exact
+        self.date = exact
     }
 
-    init(_date: Date) {
-        self._date = _date
+    init(date: Date) {
+        self.date = date
     }
 
     public var description: String {
-        "\(_date)"
+        "\(date)"
     }
 }
 
@@ -580,17 +580,17 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
             return nil
         }
         return a.map {
-            .init(_date: .init(timeIntervalSince1970: Double($0)))
+            .init(date: .init(timeIntervalSince1970: Double($0)))
         }
     }
 
     public static var clickhouseDefault: ClickHouseDateTime {
-        return .init(_date: .init(timeIntervalSince1970: 0))
+        return .init(date: .init(timeIntervalSince1970: 0))
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime], fixedLength: ClickHouseColumnMetadata?) {
         let a = array.map {
-            UInt32($0._date.timeIntervalSince1970)
+            UInt32($0.date.timeIntervalSince1970)
         }
         buffer.writeIntegerArray(a)
     }
@@ -603,23 +603,23 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
         return .dateTime(.dateTimeTimeZone(nil))
     }
 
-    public var _date: Date
+    public var date: Date
 
     public init(_ exact: Date) {
-        self._date = exact
+        self.date = exact
     }
 
-    init(_date: Date) {
-        self._date = _date
+    init(date: Date) {
+        self.date = date
     }
 
     public var description: String {
-        "\(_date)"
+        "\(date)"
     }
 }
 
 public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
-    public var __str: String
+    public var word: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, fixedLength: ClickHouseColumnMetadata?) -> [ClickHouseEnum8]? {
         guard case let .enum8Map(mapping) = fixedLength! else {
             fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
@@ -627,23 +627,23 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
         let ma2 = [Int8: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         let hm: [Int8]? = buffer.readIntegerArray(numRows: numRows)
         return hm?.map({
-            return ClickHouseEnum8(__str: ma2[$0]!)
+            return ClickHouseEnum8(word: ma2[$0]!)
         })
     }
 
     public static var clickhouseDefault: ClickHouseEnum8 {
-        return .init(__str: "")
+        return .init(word: "")
     }
 
-    public init(__str: String) {
-        self.__str = __str
+    public init(word: String) {
+        self.word = word
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum8], fixedLength: ClickHouseColumnMetadata?) {
         guard case let .enum8Map(mapping) = fixedLength! else {
             fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
         }
-        let hm = array.map { mapping[$0.__str]! }
+        let hm = array.map { mapping[$0.word]! }
         buffer.writeIntegerArray(hm)
     }
 
@@ -652,12 +652,12 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
     }
 
     public var description: String {
-        "\(__str)"
+        "\(word)"
     }
 }
 
 public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
-    public var __str: String
+    public var word: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, fixedLength: ClickHouseColumnMetadata?) -> [ClickHouseEnum16]? {
         guard case let .enum16Map(mapping) = fixedLength! else {
             fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
@@ -665,23 +665,23 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
         let ma2 = [Int16: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         let hm: [Int16]? = buffer.readIntegerArray(numRows: numRows)
         return hm?.map({
-            return ClickHouseEnum16(__str: ma2[$0]!)
+            return ClickHouseEnum16(word: ma2[$0]!)
         })
     }
 
-    public init(__str: String) {
-        self.__str = __str
+    public init(word: String) {
+        self.word = word
     }
 
     public static var clickhouseDefault: ClickHouseEnum16 {
-        return .init(__str: "")
+        return .init(word: "")
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum16], fixedLength: ClickHouseColumnMetadata?) {
         guard case let .enum16Map(mapping) = fixedLength! else {
             fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
         }
-        let hm = array.map { mapping[$0.__str]! }
+        let hm = array.map { mapping[$0.word]! }
         buffer.writeIntegerArray(hm)
     }
 
@@ -690,7 +690,7 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
     }
 
     public var description: String {
-        "\(__str)"
+        "\(word)"
     }
 }
 
