@@ -219,7 +219,7 @@ public indirect enum ClickHouseTypeName {
             return "UInt64"
         case .fixedString(let len):
             guard case let .fixedStringLength(len) = len else {
-                fatalError()
+                fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(len)")
             }
             return "FixedString(\(len))"
         case .string:
@@ -248,7 +248,7 @@ public indirect enum ClickHouseTypeName {
             return "Date32"
         case .dateTime(let timezone):
             guard case let .dateTimeTimeZone(timezone) = timezone else {
-                fatalError()
+                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadate, not\(timezone)")
             }
             if let timezone = timezone {
                 return "DateTime64(\(timezone))"
@@ -257,16 +257,15 @@ public indirect enum ClickHouseTypeName {
             return "DateTime"
         case .dateTime64(let precision):
             guard case let .dateTime64Precision(precision, timezone) = precision else {
-                fatalError()
+                fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(timezone)")
             }
             if let timezone = timezone {
                 return "DateTime64(\(precision), \(timezone))"
-
             }
             return "DateTime64(\(precision))"
         case .enum16(let mapping):
             guard case let .enum16Map(mapping) = mapping else {
-                fatalError("is type: \(mapping)")
+                fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
             }
             let hm = "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
                 .replacingOccurrences(of: ",\"", with: ",'")
@@ -275,7 +274,7 @@ public indirect enum ClickHouseTypeName {
             return "Enum16(\(hm))"
         case .enum8(let mapping):
             guard case let .enum8Map(mapping) = mapping else {
-                fatalError()
+                fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
             }
             let hm = "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
                 .replacingOccurrences(of: ",\"", with: ",'")
@@ -342,7 +341,7 @@ public indirect enum ClickHouseTypeName {
             case .string:
                 return [Array<String>].self
             case .nullable(_):
-                fatalError("no nullable in array")
+                fatalError("no nullable in array (for now)")
             case .boolean:
                 return [Array<Bool>].self
             case .date:
@@ -527,7 +526,7 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
 public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, fixedLength: ClickHouseColumnMetadata?) -> [ClickHouseDateTime64]? {
         guard case let .dateTime64Precision(precision, _) = fixedLength! else {
-            fatalError()
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(timezone)")
         }
         let hm: [Int64]? = buffer.readUnsafeGenericArray(numRows: numRows)
         return hm?.map {
@@ -546,7 +545,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime64], fixedLength: ClickHouseColumnMetadata?) {
         guard case let .dateTime64Precision(precision, _) = fixedLength! else {
-            fatalError()
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(timezone)")
         }
         let hm = array.map({
             Int64($0._date.timeIntervalSince1970 * pow(10.0, Double(precision)))
@@ -597,6 +596,10 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
     }
 
     public static func getClickHouseTypeName(fixedLength: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
+        if let fixedLength = fixedLength,
+            case let .dateTimeTimeZone(timeZone) = fixedLength {
+            return .dateTime(.dateTimeTimeZone(timeZone))
+        }
         return .dateTime(.dateTimeTimeZone(nil))
     }
 
@@ -619,7 +622,7 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
     public var __str: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, fixedLength: ClickHouseColumnMetadata?) -> [ClickHouseEnum8]? {
         guard case let .enum8Map(mapping) = fixedLength! else {
-            fatalError()
+            fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
         }
         let ma2 = [Int8: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         let hm: [Int8]? = buffer.readIntegerArray(numRows: numRows)
@@ -638,7 +641,7 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum8], fixedLength: ClickHouseColumnMetadata?) {
         guard case let .enum8Map(mapping) = fixedLength! else {
-            fatalError()
+            fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
         }
         let hm = array.map { mapping[$0.__str]! }
         buffer.writeIntegerArray(hm)
@@ -657,7 +660,7 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
     public var __str: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, fixedLength: ClickHouseColumnMetadata?) -> [ClickHouseEnum16]? {
         guard case let .enum16Map(mapping) = fixedLength! else {
-            fatalError()
+            fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
         }
         let ma2 = [Int16: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         let hm: [Int16]? = buffer.readIntegerArray(numRows: numRows)
@@ -676,7 +679,7 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum16], fixedLength: ClickHouseColumnMetadata?) {
         guard case let .enum16Map(mapping) = fixedLength! else {
-            fatalError()
+            fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
         }
         let hm = array.map { mapping[$0.__str]! }
         buffer.writeIntegerArray(hm)
@@ -696,7 +699,7 @@ extension String: ClickHouseDataType {
 
         if let fixedLength = fixedLength {
             guard case let .fixedStringLength(fixedLength) = fixedLength else {
-                fatalError()
+                fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(fixedLength)")
             }
             var strings = [String]()
             strings.reserveCapacity(numRows)
@@ -728,7 +731,7 @@ extension String: ClickHouseDataType {
     public static func writeTo(buffer: inout ByteBuffer, array: [String], fixedLength: ClickHouseColumnMetadata?) {
         if let length = fixedLength {
             guard case let .fixedStringLength(length) = length else {
-                fatalError()
+                fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(length)")
             }
             buffer.writeClickHouseFixedStrings(array, length: length)
         } else {
@@ -1070,7 +1073,7 @@ extension Array: ClickHouseDataType where Element: ClickHouseDataType {
         }
 
         buffer.writeIntegerArray(offsets)
-        
+
         array.forEach {
             Element.writeTo(buffer: &buffer, array: $0, fixedLength: fixedLength)
         }
