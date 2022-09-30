@@ -103,7 +103,7 @@ struct DataMessage {
             guard let typeEnum = ClickHouseTypeName(type) else {
                 fatalError("Unknown type \(type)")
             }
-            guard let values = typeEnum.primitiveType.readFrom(buffer: &buffer, numRows: Int(numRows), fixedLength: typeEnum.fixedLength) else {
+            guard let values = typeEnum.primitiveType.readFrom(buffer: &buffer, numRows: Int(numRows), columnMetadata: typeEnum.columnMetadata) else {
                 return nil // need more data
             }
             //print("Column: \(name), Type: \(type)")
