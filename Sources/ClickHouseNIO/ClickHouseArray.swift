@@ -47,7 +47,8 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
     }
 
     public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String) {
-        assert(type.string == Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string)
+
+        assert(type.string == Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string, "\(type.string), \(Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string)")
         buffer.writeClickHouseString(name)
         if type.string.hasPrefix("Enum") {
             buffer.writeClickHouseString(type.string.replacingOccurrences(of: "\": ", with: "' = ").replacingOccurrences(of: ", \"", with: ", '"))
@@ -115,7 +116,7 @@ public indirect enum ClickHouseTypeName {
                 guard let precision = Int(stuff[stuff.startIndex..<coI]) else {
                     return nil
                 }
-                let timeZoneS = String(stuff[coI..<stuff.endIndex])
+                let timeZoneS = String(stuff[coI..<stuff.endIndex].dropFirst(2))
                 self = .dateTime64(.dateTime64Precision(precision, timeZoneS))
             }
             else {
@@ -246,6 +247,7 @@ public indirect enum ClickHouseTypeName {
         case .nullable(let subtype):
             return "Nullable(\(subtype.string))"
         case .array(let subtype):
+            // print("Array(\(subtype.string))")
             return "Array(\(subtype.string))"
         case .boolean:
             return "Bool"
@@ -274,19 +276,25 @@ public indirect enum ClickHouseTypeName {
             guard case let .enum16Map(mapping) = mapping else {
                 fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
             }
-            let hm = "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
-                .replacingOccurrences(of: ",\"", with: ",'")
-                .replacingOccurrences(of: "' : ", with: "' = ")
-                .dropLast()
+            let hm =             mapping.map({
+                "'\($0.key)'=\($0.value)"
+            }).joined(separator: ",")
+            // "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
+            //     .replacingOccurrences(of: ",\"", with: ",'")
+            //     .replacingOccurrences(of: "' : ", with: "' = ")
+            //     .dropLast()
             return "Enum16(\(hm))"
         case .enum8(let mapping):
             guard case let .enum8Map(mapping) = mapping else {
                 fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
             }
-            let hm = "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
-                .replacingOccurrences(of: ",\"", with: ",'")
-                .replacingOccurrences(of: "' : ", with: "' = ")
-                .dropLast()
+            // mapping.map({
+            //     "'\($0.key)'=\($0.value)"
+            // }).joined(separator: ",")
+            let hm =             mapping.map({
+                "'\($0.key)'=\($0.value)"
+            }).joined(separator: ",")
+            // print(hm)
             return "Enum8(\(hm))"
         }
     }
@@ -1080,7 +1088,12 @@ extension Array: ClickHouseDataType where Element: ClickHouseDataType {
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [[Element]], columnMetadata: ClickHouseColumnMetadata?) {
-        buffer.writeIntegerArray(array.map { UInt64($0.count) } )
+        var offsets: [UInt64] = []
+        offsets.reserveCapacity(array.count)
+        for elements in array {
+            offsets.append((offsets.last ?? 0) + UInt64(elements.count))
+        }
+        buffer.writeIntegerArray(offsets)
         array.forEach {
             Element.writeTo(buffer: &buffer, array: $0, columnMetadata: columnMetadata)
         }
