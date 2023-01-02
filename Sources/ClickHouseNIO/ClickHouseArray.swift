@@ -64,7 +64,7 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
 }
 
 /// Container for the Column-Metadata
-public enum ClickHouseColumnMetadata: Codable {
+public enum ClickHouseColumnMetadata {
     case fixedStringLength(Int)
     case dateTimeTimeZone(String?)
     case dateTime64Precision(Int, String?)
@@ -255,26 +255,26 @@ public indirect enum ClickHouseTypeName {
             return "Date"
         case .date32:
             return "Date32"
-        case .dateTime(let timezone):
-            guard case let .dateTimeTimeZone(timezone) = timezone else {
-                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadate, not\(timezone)")
+        case .dateTime(let timezoneData):
+            guard case let .dateTimeTimeZone(timezoneData) = timezoneData else {
+                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not\(timezoneData)")
             }
-            if let timezone = timezone {
-                return "DateTime64(\(timezone))"
+            if let timezoneData = timezoneData {
+                return "DateTime64(\(timezoneData))"
 
             }
             return "DateTime"
         case .dateTime64(let precision):
-            guard case let .dateTime64Precision(precision, timezone) = precision else {
-                fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(timezone)")
+            guard case let .dateTime64Precision(precision, timezoneData) = precision else {
+                fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(precision)")
             }
-            if let timezone = timezone {
-                return "DateTime64(\(precision), \(timezone))"
+            if let timezoneData = timezoneData {
+                return "DateTime64(\(precision), \(timezoneData))"
             }
             return "DateTime64(\(precision))"
         case .enum16(let mapping):
             guard case let .enum16Map(mapping) = mapping else {
-                fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
+                fatalError("enum16 should have enum16Map-enum for column-metadata, not \(mapping)")
             }
             let hm =             mapping.map({
                 "'\($0.key)'=\($0.value)"
@@ -286,7 +286,7 @@ public indirect enum ClickHouseTypeName {
             return "Enum16(\(hm))"
         case .enum8(let mapping):
             guard case let .enum8Map(mapping) = mapping else {
-                fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
+                fatalError("enum8 should have enum8Map-enum for column-metadata, not\(mapping)")
             }
             // mapping.map({
             //     "'\($0.key)'=\($0.value)"
@@ -559,7 +559,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseDateTime64]? {
         guard let columnMetadata = columnMetadata,
         case let .dateTime64Precision(precision, _) = columnMetadata else {
-            fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not \(String(describing: columnMetadata))")
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         guard let intergerArray: [Int64] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
@@ -583,7 +583,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime64], columnMetadata: ClickHouseColumnMetadata?) {
         guard let columnMetadata = columnMetadata, case let .dateTime64Precision(precision, _) = columnMetadata else {
-            fatalError("dateTime64 should have dateTime64precision-enum for column-metadate, not\(String(describing: columnMetadata))")
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(String(describing: columnMetadata))")
         }
         let intergerArray = array.map({
             Int64($0.date.timeIntervalSince1970 * pow(10.0, Double(precision)))
@@ -659,7 +659,7 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
     public var word: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseEnum8]? {
         guard case let .enum8Map(mapping) = columnMetadata! else {
-            fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
+            fatalError("enum8 should have enum8Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let reversedEnumMapping = [Int8: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         guard let intergerArray: [Int8] = buffer.readIntegerArray(numRows: numRows) else {
@@ -678,7 +678,7 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum8], columnMetadata: ClickHouseColumnMetadata?) {
         guard case let .enum8Map(mapping) = columnMetadata! else {
-            fatalError("enum8 should have enum8Map-enum for column-metadate, not\(timezone)")
+            fatalError("enum8 should have enum8Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let intergerArray = array.map { mapping[$0.word]! }
         buffer.writeIntegerArray(intergerArray)
@@ -698,7 +698,7 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
     public var word: String
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseEnum16]? {
         guard case let .enum16Map(mapping) = columnMetadata! else {
-            fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
+            fatalError("enum16 should have enum16Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let reversedEnumMapping = [Int16: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
         let intergerArray: [Int16]? = buffer.readIntegerArray(numRows: numRows)
@@ -717,7 +717,7 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseEnum16], columnMetadata: ClickHouseColumnMetadata?) {
         guard case let .enum16Map(mapping) = columnMetadata! else {
-            fatalError("enum16 should have enum16Map-enum for column-metadate, not\(timezone)")
+            fatalError("enum16 should have enum16Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let intergerArray = array.map { mapping[$0.word]! }
         buffer.writeIntegerArray(intergerArray)
