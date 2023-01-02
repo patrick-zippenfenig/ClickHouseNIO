@@ -225,9 +225,9 @@ public indirect enum ClickHouseTypeName {
             return "Int64"
         case .uint64:
             return "UInt64"
-        case .fixedString(let len):
-            guard case let .fixedStringLength(len) = len else {
-                fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(len)")
+        case .fixedString(let lenOuter):
+            guard case let .fixedStringLength(len) = lenOuter else {
+                fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(lenOuter)")
             }
             return "FixedString(\(len))"
         case .string:
