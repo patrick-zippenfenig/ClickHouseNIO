@@ -257,7 +257,7 @@ public indirect enum ClickHouseTypeName {
             return "Date32"
         case .dateTime(let timezoneDataOuter):
             guard case let .dateTimeTimeZone(timezoneData) = timezoneDataOuter else {
-                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not\(timezoneDataOuter)")
+                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not \(timezoneDataOuter)")
             }
             if let timezoneData = timezoneData {
                 return "DateTime64(\(timezoneData))"
@@ -266,7 +266,7 @@ public indirect enum ClickHouseTypeName {
             return "DateTime"
         case .dateTime64(let precisionOuter):
             guard case let .dateTime64Precision(precision, timezoneData) = precisionOuter else {
-                fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(precisionOuter)")
+                fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(precisionOuter)")
             }
             if let timezoneData = timezoneData {
                 return "DateTime64(\(precision), \(timezoneData))"
@@ -286,7 +286,7 @@ public indirect enum ClickHouseTypeName {
             return "Enum16(\(hm))"
         case .enum8(let mappingOuter):
             guard case let .enum8Map(mapping) = mappingOuter else {
-                fatalError("enum8 should have enum8Map-enum for column-metadata, not\(mappingOuter)")
+                fatalError("enum8 should have enum8Map-enum for column-metadata, not \(mappingOuter)")
             }
             // mapping.map({
             //     "'\($0.key)'=\($0.value)"
@@ -556,10 +556,10 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
 /// When reading, all dates get coerced into the date-range 1900-01-01 00:00:00 to 2299-12-31 23:59:59
 /// as ClickHouse does so too when outputting the DateTime64 in String-form
 public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible {
-    public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseDateTime64]? {
-        guard let columnMetadata = columnMetadata,
+    public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata columnMetadataOuter: ClickHouseColumnMetadata?) -> [ClickHouseDateTime64]? {
+        guard let columnMetadata = columnMetadataOuter,
         case let .dateTime64Precision(precision, _) = columnMetadata else {
-            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadata))")
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadataOuter))")
         }
         guard let intergerArray: [Int64] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
@@ -581,9 +581,9 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
         return .init(date: .init(timeIntervalSince1970: 0))
     }
 
-    public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime64], columnMetadata: ClickHouseColumnMetadata?) {
-        guard let columnMetadata = columnMetadata, case let .dateTime64Precision(precision, _) = columnMetadata else {
-            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(String(describing: columnMetadata))")
+    public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime64], columnMetadata columnMetadataOuter: ClickHouseColumnMetadata?) {
+        guard let columnMetadata = columnMetadataOuter, case let .dateTime64Precision(precision, _) = columnMetadata else {
+            fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadataOuter))")
         }
         let intergerArray = array.map({
             Int64($0.date.timeIntervalSince1970 * pow(10.0, Double(precision)))
