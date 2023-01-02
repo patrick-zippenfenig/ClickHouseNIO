@@ -255,26 +255,26 @@ public indirect enum ClickHouseTypeName {
             return "Date"
         case .date32:
             return "Date32"
-        case .dateTime(let timezoneData):
-            guard case let .dateTimeTimeZone(timezoneData) = timezoneData else {
-                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not\(timezoneData)")
+        case .dateTime(let timezoneDataOuter):
+            guard case let .dateTimeTimeZone(timezoneData) = timezoneDataOuter else {
+                fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not\(timezoneDataOuter)")
             }
             if let timezoneData = timezoneData {
                 return "DateTime64(\(timezoneData))"
 
             }
             return "DateTime"
-        case .dateTime64(let precision):
-            guard case let .dateTime64Precision(precision, timezoneData) = precision else {
-                fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(precision)")
+        case .dateTime64(let precisionOuter):
+            guard case let .dateTime64Precision(precision, timezoneData) = precisionOuter else {
+                fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not\(precisionOuter)")
             }
             if let timezoneData = timezoneData {
                 return "DateTime64(\(precision), \(timezoneData))"
             }
             return "DateTime64(\(precision))"
-        case .enum16(let mapping):
-            guard case let .enum16Map(mapping) = mapping else {
-                fatalError("enum16 should have enum16Map-enum for column-metadata, not \(mapping)")
+        case .enum16(let mappingOuter):
+            guard case let .enum16Map(mapping) = mappingOuter else {
+                fatalError("enum16 should have enum16Map-enum for column-metadata, not \(mappingOuter)")
             }
             let hm =             mapping.map({
                 "'\($0.key)'=\($0.value)"
@@ -284,9 +284,9 @@ public indirect enum ClickHouseTypeName {
             //     .replacingOccurrences(of: "' : ", with: "' = ")
             //     .dropLast()
             return "Enum16(\(hm))"
-        case .enum8(let mapping):
-            guard case let .enum8Map(mapping) = mapping else {
-                fatalError("enum8 should have enum8Map-enum for column-metadata, not\(mapping)")
+        case .enum8(let mappingOuter):
+            guard case let .enum8Map(mapping) = mappingOuter else {
+                fatalError("enum8 should have enum8Map-enum for column-metadata, not\(mappingOuter)")
             }
             // mapping.map({
             //     "'\($0.key)'=\($0.value)"
