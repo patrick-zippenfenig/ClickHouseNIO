@@ -305,6 +305,7 @@ final class ClickHouseNIOTests: XCTestCase {
             id Int32,
             date Date,
             dateTime DateTime,
+            dateTimeT DateTime('GMT'),
             dateTime64 DateTime64(3, 'GMT')
             )
             ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
@@ -329,6 +330,13 @@ final class ClickHouseNIOTests: XCTestCase {
             //     ClickHouseDate32(Date(timeIntervalSince1970: -300)),
             // ]),
             ClickHouseColumn("dateTime", [
+                ClickHouseDateTime(Date(timeIntervalSince1970: 0)),
+                ClickHouseDateTime(Date(timeIntervalSince1970: 1287842244)),
+                ClickHouseDateTime(Date(timeIntervalSince1970: 4294967295)),
+                ClickHouseDateTime(Date(timeIntervalSince1970: 0)),
+                ClickHouseDateTime(Date(timeIntervalSince1970: 0)),
+            ]),
+            ClickHouseColumn("dateTimeT", [
                 ClickHouseDateTime(Date(timeIntervalSince1970: 0)),
                 ClickHouseDateTime(Date(timeIntervalSince1970: 1287842244)),
                 ClickHouseDateTime(Date(timeIntervalSince1970: 4294967295)),
@@ -379,6 +387,21 @@ final class ClickHouseNIOTests: XCTestCase {
         //     )
         // }.wait()
         try! conn.connection.query(sql: "SELECT dateTime FROM test").map { res in
+            //print(res)
+            guard let dateTime = res.columns[0].values as? [ClickHouseDateTime] else {
+                fatalError("Column `nullable`, was not a Nullable UInt32 array")
+            }
+            XCTAssertEqual(dateTime.map({ $0.date }),
+                [
+                    Date(timeIntervalSince1970: 0),
+                    Date(timeIntervalSince1970: 1287842244),
+                    Date(timeIntervalSince1970: 4294967295),
+                    Date(timeIntervalSince1970: 0),
+                    Date(timeIntervalSince1970: 0),
+                ]
+            )
+        }.wait()
+        try! conn.connection.query(sql: "SELECT dateTimeT FROM test").map { res in
             //print(res)
             guard let dateTime = res.columns[0].values as? [ClickHouseDateTime] else {
                 fatalError("Column `nullable`, was not a Nullable UInt32 array")

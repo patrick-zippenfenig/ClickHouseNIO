@@ -129,7 +129,7 @@ public indirect enum ClickHouseTypeName {
         else if type.starts(with: "DateTime(") {
             let stuff = type.dropFirst("DateTime(".count).dropLast()
             let timeZoneS = String(stuff)
-            self = .dateTime64(.dateTimeTimeZone(timeZoneS))
+            self = .dateTime(.dateTimeTimeZone(timeZoneS))
 
         }
         else if type.starts(with: "Array(") {
@@ -260,7 +260,7 @@ public indirect enum ClickHouseTypeName {
                 fatalError("dateTime should have dateTimeTimeZone-enum for column-metadata, not \(timezoneDataOuter)")
             }
             if let timezoneData = timezoneData {
-                return "DateTime64(\(timezoneData))"
+                return "DateTime(\(timezoneData))"
 
             }
             return "DateTime"
