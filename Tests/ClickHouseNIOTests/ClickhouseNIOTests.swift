@@ -15,18 +15,17 @@ class TestConnection {
         self.logger = logger
 
         eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        let ip = ProcessInfo.processInfo.environment["CLICKHOUSE_SERVER"] ?? "172.25.101.30"
+        let ip = ProcessInfo.processInfo.environment["CLICKHOUSE_SERVER"] ?? "localhost"
         let user = ProcessInfo.processInfo.environment["CLICKHOUSE_USER"] ?? "default"
-        let password = ProcessInfo.processInfo.environment["CLICKHOUSE_PASSWORD"] ?? "admin"
+        let password = ProcessInfo.processInfo.environment["CLICKHOUSE_PASSWORD"] ?? ""
         logger.info("Connecting to ClickHouse server at \(ip)")
         // openssl req -subj "/CN=my.host.name" -days 365 -nodes -new -x509 -keyout /etc/clickhouse-server/server.key -out /etc/clickhouse-server/server.crt
         // openssl dhparam -out /etc/clickhouse-server/dhparam.pem 1024 // NOTE use 4096 in prod
         // chown -R clickhouse:clickhouse /etc/clickhouse-server/
         // Port 9440 = secure tcp, 9000 regular tcp
-        let socket = try! SocketAddress(ipAddress: ip, port: 9440)
-        let tls = TLSConfiguration.forClient(certificateVerification: .none)
-        let config = ClickHouseConfiguration(
-            serverAddresses: socket, user: user, password: password, connectTimeout: .seconds(10), readTimeout: .seconds(3), queryTimeout: .seconds(5), tlsConfiguration: tls)
+        let tls = TLSConfiguration.makePreSharedKeyConfiguration()
+        let config = try! ClickHouseConfiguration(
+            hostname: ip, user: user, password: password, connectTimeout: .seconds(10), readTimeout: .seconds(3), queryTimeout: .seconds(5), tlsConfiguration: tls)
         connection = try! ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
     }
 
