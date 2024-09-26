@@ -1,0 +1,60 @@
+# https://github.com/peripheryapp/periphery/blob/master/.github/workflows/test.yml
+
+name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+env:
+  swift_package_resolve: swift package resolve
+  swift_build: swift build --build-tests
+  swift_test: CLICKHOUSE_USER="default" CLICKHOUSE_PASSWORD="" swift test
+  cache_version: 1
+  CLICKHOUSE_SERVER: clickhouse
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        swift: ["5.10", "5.9", "5.8"]
+        include:
+          - swift: "5.10"
+            container: "swift:5.10"
+            cache-version: 1
+          - swift: "5.9"
+            container: "swift:5.9"
+            cache-version: 1
+          - swift: "5.8"
+            container: "swift:5.8"
+            cache-version: 1
+    runs-on: ubuntu-20.04
+    container: ${{ matrix.container }}
+    name: Linux
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server
+    steps:
+    - name: Get Swift Version
+      id: get-swift-version
+      run: |
+        echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
+      shell: bash
+    - uses: actions/checkout@master
+    - name: Cache resolved dependencies
+      id: cache-resolved-dependencies
+      uses: actions/cache@v2
+      with:
+        path: |
+          .build
+          Package.resolved
+        key: ${{ matrix.cache-version }}-${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        restore-keys: |
+          ${{ matrix.cache-version }}-${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+    - name: Resolve dependencies
+      if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
+      run: ${{ env.swift_package_resolve }}
+    - name: Build
+      run: ${{ env.swift_build }}
+    - name: Test
+      run: ${{ env.swift_test }}
