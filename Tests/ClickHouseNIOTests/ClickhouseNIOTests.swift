@@ -23,7 +23,7 @@ class TestConnection {
         // openssl dhparam -out /etc/clickhouse-server/dhparam.pem 1024 // NOTE use 4096 in prod
         // chown -R clickhouse:clickhouse /etc/clickhouse-server/
         // Port 9440 = secure tcp, 9000 regular tcp
-        let tls = TLSConfiguration.makePreSharedKeyConfiguration()
+        let tls = TLSConfiguration.forClient(certificateVerification: .none)
         let config = try! ClickHouseConfiguration(
             hostname: ip, user: user, password: password, connectTimeout: .seconds(10), readTimeout: .seconds(3), queryTimeout: .seconds(5), tlsConfiguration: tls)
         connection = try! ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
