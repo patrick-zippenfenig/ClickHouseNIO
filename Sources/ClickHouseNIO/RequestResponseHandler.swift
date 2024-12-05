@@ -25,7 +25,7 @@ import NIO
 ///
 /// `RequestResponseHandler` requires that the `Response`s arrive on `Channel` in the same order as the `Request`s
 /// were submitted.
-public final class RequestResponseHandler<Request, Response>: ChannelDuplexHandler {
+public final class RequestResponseHandler<Request: Sendable, Response: Sendable>: ChannelDuplexHandler {
     public typealias InboundIn = Response
     public typealias InboundOut = Never
     public typealias OutboundIn = (Request, EventLoopPromise<Response>)
@@ -47,7 +47,6 @@ public final class RequestResponseHandler<Request, Response>: ChannelDuplexHandl
 
     private var state: State = .operational
     private var promiseBuffer: CircularBuffer<EventLoopPromise<Response>>
-
 
     /// Create a new `RequestResponseHandler`.
     ///

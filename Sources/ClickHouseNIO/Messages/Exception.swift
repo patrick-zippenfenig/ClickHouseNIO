@@ -15,7 +15,7 @@ struct ExceptionMessage: Error {
     let stackTrace: String
     // using array to nest structs
     let nested: [ExceptionMessage]
-    
+
     init?(from buffer: inout ByteBuffer) {
         guard let code: UInt32 = buffer.readInteger(),
             let name = buffer.readClickHouseString(),

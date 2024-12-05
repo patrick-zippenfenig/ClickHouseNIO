@@ -8,7 +8,7 @@
 import Foundation
 import NIO
 
-public struct ClickHouseColumn {
+public struct ClickHouseColumn: Sendable {
     public let name: String
     public let values: ClickHouseDataTypeArray
 
@@ -20,11 +20,11 @@ public struct ClickHouseColumn {
     }
 
     public func merge(with: [ClickHouseColumn]) throws -> ClickHouseColumn {
-        return ClickHouseColumn(name, try values.merge(with: with.map({$0.values})) )
+        return ClickHouseColumn(name, try values.merge(with: with.map({ $0.values })))
     }
 }
 
-public protocol ClickHouseDataTypeArray {
+public protocol ClickHouseDataTypeArray: Sendable {
     var count: Int { get }
 
     func merge(with: [ClickHouseDataTypeArray]) throws -> ClickHouseDataTypeArray
@@ -34,8 +34,7 @@ public protocol ClickHouseDataTypeArray {
     static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseDataTypeArray?
 }
 
-
-extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
+extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType & Sendable {
     public func merge(with: [ClickHouseDataTypeArray]) throws -> ClickHouseDataTypeArray {
         let sameType = try with.map { anyArray -> [Element] in
             guard let column = anyArray as? [Element] else {
@@ -43,18 +42,19 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
             }
             return column
         }
-        return ([self] + sameType).flatMap({$0})
+        return ([self] + sameType).flatMap({ $0 })
     }
 
     public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String) {
-
         assert(type.string == Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string, "\(type.string), \(Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string)")
+
         buffer.writeClickHouseString(name)
         if type.string.hasPrefix("Enum") {
             buffer.writeClickHouseString(type.string.replacingOccurrences(of: "\": ", with: "' = ").replacingOccurrences(of: ", \"", with: ", '"))
         } else {
             buffer.writeClickHouseString(type.string)
         }
+
         Element.writeTo(buffer: &buffer, array: self, columnMetadata: type.columnMetadata)
     }
 
@@ -64,7 +64,7 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
 }
 
 /// Container for the Column-Metadata
-public enum ClickHouseColumnMetadata {
+public enum ClickHouseColumnMetadata: Sendable {
     case fixedStringLength(Int)
     case dateTimeTimeZone(String?)
     case dateTime64Precision(Int, String?)
@@ -72,7 +72,7 @@ public enum ClickHouseColumnMetadata {
     case enum16Map([String: Int16])
 }
 
-public indirect enum ClickHouseTypeName {
+public indirect enum ClickHouseTypeName: Sendable {
     case float
     case float64
     case int8
@@ -103,14 +103,12 @@ public indirect enum ClickHouseTypeName {
                 return nil
             }
             self = .nullable(subType)
-        }
-        else if type.starts(with: "FixedString(") {
+        } else if type.starts(with: "FixedString(") {
             guard let len = Int(type.dropFirst("FixedString(".count).dropLast()) else {
                 return nil
             }
             self = .fixedString(.fixedStringLength(len))
-        }
-        else if type.starts(with: "DateTime64(") {
+        } else if type.starts(with: "DateTime64(") {
             let stuff = type.dropFirst("DateTime64(".count).dropLast()
             if let coI = stuff.firstIndex(of: ",") {
                 guard let precision = Int(stuff[stuff.startIndex..<coI]) else {
@@ -118,82 +116,59 @@ public indirect enum ClickHouseTypeName {
                 }
                 let timeZoneS = String(stuff[coI..<stuff.endIndex].dropFirst(2))
                 self = .dateTime64(.dateTime64Precision(precision, timeZoneS))
-            }
-            else {
+            } else {
                 guard let precision = Int(stuff) else {
                     return nil
                 }
                 self = .dateTime64(.dateTime64Precision(precision, nil))
             }
-        }
-        else if type.starts(with: "DateTime(") {
+        } else if type.starts(with: "DateTime(") {
             let stuff = type.dropFirst("DateTime(".count).dropLast()
             let timeZoneS = String(stuff)
             self = .dateTime(.dateTimeTimeZone(timeZoneS))
-
-        }
-        else if type.starts(with: "Array(") {
+        } else if type.starts(with: "Array(") {
             let subTypeName = String(type.dropFirst("Array(".count).dropLast())
             guard let subType = ClickHouseTypeName(subTypeName) else {
                 return nil
             }
             self = .array(subType)
-        }
-        else if type.starts(with: "Enum8(") {
+        } else if type.starts(with: "Enum8(") {
             let columnMapping = String(type.dropFirst("Enum8(".count).dropLast())
             guard let data = ("{" + columnMapping.replacingOccurrences(of: "' = ", with: "\" : ").replacingOccurrences(of: "'", with: "\"") + "}").data(using: .utf8),
                 let mapping = try? JSONDecoder().decode([String: Int8].self, from: data) else {
                     return nil
                 }
             self = .enum8(.enum8Map(mapping))
-        }
-        else if type.starts(with: "Enum16(") {
+        } else if type.starts(with: "Enum16(") {
             let columnMapping = String(type.dropFirst("Enum16(".count).dropLast())
             guard let data = ("{" + columnMapping.replacingOccurrences(of: "' = ", with: "\" : ").replacingOccurrences(of: "'", with: "\"") + "}").data(using: .utf8),
                 let mapping = try? JSONDecoder().decode([String: Int16].self, from: data) else {
                     return nil
                 }
             self = .enum16(.enum16Map(mapping))
-        }
-        else {
+        } else {
             switch type {
-            case "Float32":
-                self = .float
-            case "Float64":
-                self = .float64
-            case "Int8":
-                self = .int8
-            case "Int16":
-                self = .int16
-            case "Int32":
-                self = .int32
-            case "Int64":
-                self = .int64
-            case "UInt8":
-                self = .uint8
-            case "UInt16":
-                self = .uint16
-            case "UInt32":
-                self = .uint32
-            case "UInt64":
-                self = .uint64
-            case "UUID":
-                self = .uuid
-            case "String":
-                self = .string
-            case "Date":
-                self =  .date
-            case "Date32":
-                self  = .date32
-            case "DateTime":
-                self  = .dateTime(.dateTimeTimeZone(nil))
-            case "Bool":
-                self  = .boolean
-            default:
-                return nil
+            case "Float32": self = .float
+            case "Float64": self = .float64
+            case "Int8": self = .int8
+            case "Int16": self = .int16
+            case "Int32": self = .int32
+            case "Int64": self = .int64
+            case "UInt8": self = .uint8
+            case "UInt16": self = .uint16
+            case "UInt32": self = .uint32
+            case "UInt64": self = .uint64
+            case "UUID": self = .uuid
+            case "String": self = .string
+            case "Date": self = .date
+            case "Date32": self = .date32
+            case "DateTime": self = .dateTime(.dateTimeTimeZone(nil))
+            case "Bool": self = .boolean
+            default: return nil
             }
         }
     }
+
     public var columnMetadata: ClickHouseColumnMetadata? {
         switch self {
         case .fixedString(let len):
@@ -247,7 +222,6 @@ public indirect enum ClickHouseTypeName {
         case .nullable(let subtype):
             return "Nullable(\(subtype.string))"
         case .array(let subtype):
-            // print("Array(\(subtype.string))")
             return "Array(\(subtype.string))"
         case .boolean:
             return "Bool"
@@ -261,7 +235,6 @@ public indirect enum ClickHouseTypeName {
             }
             if let timezoneData = timezoneData {
                 return "DateTime(\(timezoneData))"
-
             }
             return "DateTime"
         case .dateTime64(let precisionOuter):
@@ -276,7 +249,7 @@ public indirect enum ClickHouseTypeName {
             guard case let .enum16Map(mapping) = mappingOuter else {
                 fatalError("enum16 should have enum16Map-enum for column-metadata, not \(mappingOuter)")
             }
-            let hm =             mapping.map({
+            let hm = mapping.map({
                 "'\($0.key)'=\($0.value)"
             }).joined(separator: ",")
             // "\(mapping)".replacingOccurrences(of: "[\"", with: "'")
@@ -291,7 +264,7 @@ public indirect enum ClickHouseTypeName {
             // mapping.map({
             //     "'\($0.key)'=\($0.value)"
             // }).joined(separator: ",")
-            let hm =             mapping.map({
+            let hm = mapping.map({
                 "'\($0.key)'=\($0.value)"
             }).joined(separator: ",")
             // print(hm)
@@ -301,153 +274,88 @@ public indirect enum ClickHouseTypeName {
 
     public var primitiveType: ClickHouseDataTypeArray.Type {
         switch self {
-        case .float:
-            return [Float].self
-        case .float64:
-            return [Double].self
-        case .int8:
-            return [Int8].self
-        case .int16:
-            return [Int16].self
-        case .int32:
-            return [Int32].self
-        case .int64:
-            return [Int64].self
-        case .uint8:
-            return [UInt8].self
-        case .uint16:
-            return [UInt16].self
-        case .uint32:
-            return [UInt32].self
-        case .uint64:
-            return [UInt64].self
-        case .uuid:
-            return [UUID].self
-        case .fixedString(_):
-            return [String].self
-        case .string:
-            return [String].self
+        case .float: return [Float].self
+        case .float64: return [Double].self
+        case .int8: return [Int8].self
+        case .int16: return [Int16].self
+        case .int32: return [Int32].self
+        case .int64: return [Int64].self
+        case .uint8: return [UInt8].self
+        case .uint16: return [UInt16].self
+        case .uint32: return [UInt32].self
+        case .uint64: return [UInt64].self
+        case .uuid: return [UUID].self
+        case .fixedString(_): return [String].self
+        case .string: return [String].self
         case .array(let type):
             switch type {
-            case .float:
-                return [Array<Float>].self
-            case .float64:
-                return [Array<Double>].self
-            case .int8:
-                return [Array<Int8>].self
-            case .int16:
-                return [Array<Int16>].self
-            case .int32:
-                return [Array<Int32>].self
-            case .int64:
-                return [Array<Int64>].self
-            case .uint8:
-                return [Array<UInt8>].self
-            case .uint16:
-                return [Array<UInt16>].self
-            case .uint32:
-                return [Array<UInt32>].self
-            case .uint64:
-                return [Array<UInt64>].self
-            case .uuid:
-                return [Array<UUID>].self
-            case .fixedString(_):
-                return [Array<String>].self
-            case .string:
-                return [Array<String>].self
-            case .nullable(_):
-                fatalError("no nullable in array (for now)")
-            case .boolean:
-                return [Array<Bool>].self
-            case .date:
-                return [Array<ClickHouseDate>].self
-            case .date32:
-                return [Array<ClickHouseDate32>].self
-            case .dateTime:
-                return [Array<ClickHouseDateTime>].self
-            case .dateTime64:
-                return [Array<ClickHouseDateTime64>].self
-            case .enum16:
-                return [Array<ClickHouseEnum16>].self
-            case .enum8:
-                return [Array<ClickHouseEnum8>].self
-            case .array(_):
-                fatalError("array cannot be nested (for now)")
+            case .float: return [[Float]].self
+            case .float64: return [[Double]].self
+            case .int8: return [[Int8]].self
+            case .int16: return [[Int16]].self
+            case .int32: return [[Int32]].self
+            case .int64: return [[Int64]].self
+            case .uint8: return [[UInt8]].self
+            case .uint16: return [[UInt16]].self
+            case .uint32: return [[UInt32]].self
+            case .uint64: return [[UInt64]].self
+            case .uuid: return [[UUID]].self
+            case .fixedString(_): return [[String]].self
+            case .string: return [[String]].self
+            case .nullable(_): fatalError("no nullable in array (for now)")
+            case .boolean: return [[Bool]].self
+            case .date: return [[ClickHouseDate]].self
+            case .date32: return [[ClickHouseDate32]].self
+            case .dateTime: return [[ClickHouseDateTime]].self
+            case .dateTime64: return [[ClickHouseDateTime64]].self
+            case .enum16: return [[ClickHouseEnum16]].self
+            case .enum8: return [[ClickHouseEnum8]].self
+            case .array(_): fatalError("array cannot be nested (for now)")
             }
-            return [String].self
-        case .boolean:
-            return [Bool].self
-        case .date:
-            return [ClickHouseDate].self
-        case .date32:
-            return [ClickHouseDate32].self
-        case .dateTime:
-            return [ClickHouseDateTime].self
-        case .dateTime64:
-            return [ClickHouseDateTime64].self
-        case .enum16:
-            return [ClickHouseEnum16].self
-        case .enum8:
-            return [ClickHouseEnum8].self
+        case .boolean: return [Bool].self
+        case .date: return [ClickHouseDate].self
+        case .date32: return [ClickHouseDate32].self
+        case .dateTime: return [ClickHouseDateTime].self
+        case .dateTime64: return [ClickHouseDateTime64].self
+        case .enum16: return [ClickHouseEnum16].self
+        case .enum8: return [ClickHouseEnum8].self
         case .nullable(let type):
             switch type {
-            case .float:
-                return [Float?].self
-            case .float64:
-                return [Double?].self
-            case .int8:
-                return [Int8?].self
-            case .int16:
-                return [Int16?].self
-            case .int32:
-                return [Int32?].self
-            case .int64:
-                return [Int64?].self
-            case .uint8:
-                return [UInt8?].self
-            case .uint16:
-                return [UInt16?].self
-            case .uint32:
-                return [UInt32?].self
-            case .uint64:
-                return [UInt64?].self
-            case .uuid:
-                return [UUID?].self
-            case .fixedString(_):
-                return [String?].self
-            case .string:
-                return [String?].self
-            case .array(_):
-                fatalError("no array in nullable (for now)")
-            case .boolean:
-                return [Bool?].self
-            case .date:
-                return [ClickHouseDate?].self
-            case .date32:
-                return [ClickHouseDate32?].self
-            case .dateTime:
-                return [ClickHouseDateTime?].self
-            case .dateTime64:
-                return [ClickHouseDateTime64?].self
-            case .enum16:
-                return [ClickHouseEnum16?].self
-            case .enum8:
-                return [ClickHouseEnum8?].self
-            case .nullable(_):
-                fatalError("Nullable cannot be nested")
+            case .float: return [Float?].self
+            case .float64: return [Double?].self
+            case .int8: return [Int8?].self
+            case .int16: return [Int16?].self
+            case .int32: return [Int32?].self
+            case .int64: return [Int64?].self
+            case .uint8: return [UInt8?].self
+            case .uint16: return [UInt16?].self
+            case .uint32: return [UInt32?].self
+            case .uint64: return [UInt64?].self
+            case .uuid: return [UUID?].self
+            case .fixedString(_): return [String?].self
+            case .string: return [String?].self
+            case .array(_): fatalError("no array in nullable (for now)")
+            case .boolean: return [Bool?].self
+            case .date: return [ClickHouseDate?].self
+            case .date32: return [ClickHouseDate32?].self
+            case .dateTime: return [ClickHouseDateTime?].self
+            case .dateTime64: return [ClickHouseDateTime64?].self
+            case .enum16: return [ClickHouseEnum16?].self
+            case .enum8: return [ClickHouseEnum8?].self
+            case .nullable(_): fatalError("Nullable cannot be nested")
             }
         }
     }
 }
 
-public protocol ClickHouseDataType {
-    /// Used by ORM to determinte the type of a given array
+public protocol ClickHouseDataType: Sendable {
+    /// Used by ORM to determine the type of a given array
     static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName
 
     /// Write an array of this type to a bytebuffer
     static func writeTo(buffer: inout ByteBuffer, array: [Self], columnMetadata: ClickHouseColumnMetadata?)
 
-    /// Return nil for more data. Moved buffer forward if sucessfull
+    /// Return nil for more data. Moved buffer forward if successful
     static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Self]?
 
     /// Default value. Used for nullable values
@@ -455,12 +363,12 @@ public protocol ClickHouseDataType {
 }
 
 /// Struct for the Date32-ClickHouse-Type, has a date-field which is a swift-date
-public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible, Sendable {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseDate32]? {
-        guard let intergerArray: [Int32] = buffer.readIntegerArray(numRows: numRows) else {
+        guard let integerArray: [Int32] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
         }
-        return intergerArray.map { .init(date: Date(timeIntervalSince1970: Double(24 * 3600 * Int($0)))) }
+        return integerArray.map { .init(date: Date(timeIntervalSince1970: Double(24 * 3600 * Int($0)))) }
     }
 
     /// constructs a ClickHouseDate32 with the given Date without changing anything
@@ -486,10 +394,10 @@ public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible {
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDate32], columnMetadata: ClickHouseColumnMetadata?) {
-        let intergerArray = array.map {
+        let integerArray = array.map {
             Int32($0.date.timeIntervalSince1970 / (24 * 3600))
         }
-        buffer.writeIntegerArray(intergerArray)
+        buffer.writeIntegerArray(integerArray)
     }
 
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
@@ -504,12 +412,12 @@ public struct ClickHouseDate32: ClickHouseDataType, CustomStringConvertible {
 }
 
 /// Struct for the Date-ClickHouse-Type, has a date-field which is a swift-date
-public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible, Sendable {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseDate]? {
-        guard let intergerArray: [UInt16] = buffer.readIntegerArray(numRows: numRows) else {
+        guard let integerArray: [UInt16] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
         }
-        return intergerArray.map { .init(.init(timeIntervalSince1970: Double(24 * 3600 * Int($0)))) }
+        return integerArray.map { .init(.init(timeIntervalSince1970: Double(24 * 3600 * Int($0)))) }
     }
 
     public static var clickhouseDefault: ClickHouseDate {
@@ -517,10 +425,10 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDate], columnMetadata: ClickHouseColumnMetadata?) {
-        let intergerArray: [UInt16] = array.map {
+        let integerArray: [UInt16] = array.map {
             UInt16($0.date.timeIntervalSince1970 / (24 * 3600))
         }
-        buffer.writeIntegerArray(intergerArray)
+        buffer.writeIntegerArray(integerArray)
     }
 
     /// constructs a ClickHouseDate with the given Date without changing anything
@@ -555,16 +463,16 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
 /// Struct for the DateTime64-ClickHouse-Type, has a date-field which is a swift-date
 /// When reading, all dates get coerced into the date-range 1900-01-01 00:00:00 to 2299-12-31 23:59:59
 /// as ClickHouse does so too when outputting the DateTime64 in String-form
-public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible, Sendable {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata columnMetadataOuter: ClickHouseColumnMetadata?) -> [ClickHouseDateTime64]? {
         guard let columnMetadata = columnMetadataOuter,
         case let .dateTime64Precision(precision, _) = columnMetadata else {
             fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadataOuter))")
         }
-        guard let intergerArray: [Int64] = buffer.readIntegerArray(numRows: numRows) else {
+        guard let integerArray: [Int64] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
         }
-        return intergerArray.map {
+        return integerArray.map {
             let precisionFactor = pow(10.0, -1.0 * Double(precision))
             let secondsSince1970 = Double($0) * precisionFactor
             guard secondsSince1970 >= -2_208_988_800.0 else {
@@ -585,10 +493,10 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
         guard let columnMetadata = columnMetadataOuter, case let .dateTime64Precision(precision, _) = columnMetadata else {
             fatalError("dateTime64 should have dateTime64precision-enum for column-metadata, not \(String(describing: columnMetadataOuter))")
         }
-        let intergerArray = array.map({
+        let integerArray = array.map({
             Int64($0.date.timeIntervalSince1970 * pow(10.0, Double(precision)))
         })
-        buffer.writeIntegerArray(intergerArray)
+        buffer.writeIntegerArray(integerArray)
     }
 
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
@@ -611,12 +519,12 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
 }
 
 /// Struct for the DateTime-ClickHouse-Type, has a date-field which is a swift-date
-public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible, Sendable {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseDateTime]? {
-        guard let intergerArray: [UInt32] = buffer.readIntegerArray(numRows: numRows) else {
+        guard let integerArray: [UInt32] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
         }
-        return intergerArray.map { .init(date: .init(timeIntervalSince1970: Double($0))) }
+        return integerArray.map { .init(date: .init(timeIntervalSince1970: Double($0))) }
     }
 
     public static var clickhouseDefault: ClickHouseDateTime {
@@ -624,10 +532,10 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [ClickHouseDateTime], columnMetadata: ClickHouseColumnMetadata?) {
-        let intergerArray = array.map {
+        let integerArray = array.map {
             UInt32($0.date.timeIntervalSince1970)
         }
-        buffer.writeIntegerArray(intergerArray)
+        buffer.writeIntegerArray(integerArray)
     }
 
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
@@ -655,17 +563,18 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
 
 /// Struct for an Enum based on an Int8, only has the word-field which is a String
 /// and the string representation of the enum, it doesn't know the corresponding Int8
-public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible, Sendable {
     public var word: String
+
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseEnum8]? {
         guard case let .enum8Map(mapping) = columnMetadata! else {
             fatalError("enum8 should have enum8Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let reversedEnumMapping = [Int8: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
-        guard let intergerArray: [Int8] = buffer.readIntegerArray(numRows: numRows) else {
+        guard let integerArray: [Int8] = buffer.readIntegerArray(numRows: numRows) else {
             return nil
         }
-        return intergerArray.map { return ClickHouseEnum8(word: reversedEnumMapping[$0]!) }
+        return integerArray.map { return ClickHouseEnum8(word: reversedEnumMapping[$0]!) }
     }
 
     public static var clickhouseDefault: ClickHouseEnum8 {
@@ -680,8 +589,8 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
         guard case let .enum8Map(mapping) = columnMetadata! else {
             fatalError("enum8 should have enum8Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
-        let intergerArray = array.map { mapping[$0.word]! }
-        buffer.writeIntegerArray(intergerArray)
+        let integerArray = array.map { mapping[$0.word]! }
+        buffer.writeIntegerArray(integerArray)
     }
 
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
@@ -692,17 +601,19 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
         "\(word)"
     }
 }
+
 /// Struct for an Enum based on an Int16, only has the word-field which is a String
 /// and the string representation of the enum, it doesn't know the corresponding Int16
-public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
+public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible, Sendable {
     public var word: String
+
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [ClickHouseEnum16]? {
         guard case let .enum16Map(mapping) = columnMetadata! else {
             fatalError("enum16 should have enum16Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
         let reversedEnumMapping = [Int16: String](uniqueKeysWithValues: zip(mapping.values, mapping.keys))
-        let intergerArray: [Int16]? = buffer.readIntegerArray(numRows: numRows)
-        return intergerArray?.map({
+        let integerArray: [Int16]? = buffer.readIntegerArray(numRows: numRows)
+        return integerArray?.map({
             return ClickHouseEnum16(word: reversedEnumMapping[$0]!)
         })
     }
@@ -719,8 +630,8 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
         guard case let .enum16Map(mapping) = columnMetadata! else {
             fatalError("enum16 should have enum16Map-enum for column-metadata, not \(String(describing: columnMetadata))")
         }
-        let intergerArray = array.map { mapping[$0.word]! }
-        buffer.writeIntegerArray(intergerArray)
+        let integerArray = array.map { mapping[$0.word]! }
+        buffer.writeIntegerArray(integerArray)
     }
 
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
@@ -728,13 +639,12 @@ public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
     }
 
     public var description: String {
-        "\(word)"
+        return "\(word)"
     }
 }
 
 extension String: ClickHouseDataType {
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [String]? {
-
         if let columnMetadata = columnMetadata {
             guard case let .fixedStringLength(fixedLength) = columnMetadata else {
                 fatalError("fixed-length strings should have fixedStringLength-enum for column-metadata, not \(columnMetadata)")
@@ -1008,7 +918,7 @@ extension UUID: ClickHouseDataType {
 }
 
 extension Optional: ClickHouseDataType where Wrapped: ClickHouseDataType {
-    public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Optional<Wrapped>]? {
+    public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Wrapped?]? {
         var bufferCopy = buffer
 
         guard bufferCopy.readableBytes >= (1) * numRows else {
@@ -1033,11 +943,11 @@ extension Optional: ClickHouseDataType where Wrapped: ClickHouseDataType {
         return mapped
     }
 
-    public static var clickhouseDefault: Optional<Wrapped> {
+    public static var clickhouseDefault: Wrapped? {
         return nil
     }
 
-    public static func writeTo(buffer: inout ByteBuffer, array: [Optional<Wrapped>], columnMetadata: ClickHouseColumnMetadata?) {
+    public static func writeTo(buffer: inout ByteBuffer, array: [Wrapped?], columnMetadata: ClickHouseColumnMetadata?) {
         buffer.reserveCapacity(array.count * (1) + buffer.writableBytes)
         // Frist write one array with 0/1 for nullable, then data
         for element in array {

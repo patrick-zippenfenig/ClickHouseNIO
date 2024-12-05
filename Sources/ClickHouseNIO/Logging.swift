@@ -8,7 +8,7 @@
 import Foundation
 import Logging
 
-public struct ClickHouseLogging {
+public enum ClickHouseLogging {
     public static let base = Logger(label: "ClickHouseNIO.Connection")
 }
 

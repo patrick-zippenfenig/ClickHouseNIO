@@ -1,6 +1,6 @@
 # ClickHouseNIO
 
-![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-green.svg) ![Platforms](https://img.shields.io/badge/Platforms-macOS%20Linux-green.svg) [![codebeat badge](https://codebeat.co/badges/d15d7e95-d3df-4f97-974c-c3a7d9c07a9e)](https://codebeat.co/projects/github-com-patrick-zippenfenig-clickhousenio-main) [![CircleCI](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main.svg?style=svg)](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main) 
+![Swift 5](https://img.shields.io/badge/Swift-5-orange.svg) ![SPM](https://img.shields.io/badge/SPM-compatible-green.svg) ![Platforms](https://img.shields.io/badge/Platforms-macOS%20Linux-green.svg) [![codebeat badge](https://codebeat.co/badges/d15d7e95-d3df-4f97-974c-c3a7d9c07a9e)](https://codebeat.co/projects/github-com-patrick-zippenfenig-clickhousenio-main) [![CircleCI](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main.svg?style=svg)](https://circleci.com/gh/patrick-zippenfenig/ClickHouseNIO/tree/main)
 
 High performance Swift [ClickHouse](https://clickhouse.tech) client based on [SwiftNIO 2](https://github.com/apple/swift-nio). It is inspired by the [ClickHouse source code](https://github.com/ClickHouse/ClickHouse/tree/master/src/Client) (C++), but written in pure Swift.
 
@@ -31,7 +31,7 @@ This client provides raw query capabilities. Connection pooling or relational ab
 $ swift build
 ```
 
-## Usage 
+## Usage
 
 1. Connect to a ClickHouseServer. The client requires a `eventLoop` which is usually provided by frameworks which use SwiftNIO. We also use `wait()` for simplicity, but it is discouraged for production code.
 
@@ -40,13 +40,13 @@ import NIO
 import ClickHouseNIO
 
 let config = try ClickHouseConfiguration(
-    hostname: "localhost", 
-    port: 9000, 
-    user: "default", 
-    password: "admin", 
+    hostname: "localhost",
+    port: 9000,
+    user: "default",
+    password: "admin",
     database: "default")
-  
-let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)  
+
+let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 let connection = try ClickHouseConnection.connect(configuration: config, on: eventLoopGroup.next()).wait()
 ```
 
@@ -81,7 +81,7 @@ let data = [
 try! connection.insert(into: "test", data: data).wait()
 ````
 
-5. Query data and cast is to the exptected array
+5. Query data and cast is to the expected array
 
 ```swift
 try! conn.connection.query(sql: "SELECT * FROM test").map { res in
@@ -104,10 +104,10 @@ For TLS encrypted connections to the ClickHouse server, a `tlsConfiguration` att
 let tls = TLSConfiguration.forClient(certificateVerification: .none)
 
 let config = try ClickHouseConfiguration(
-    hostname: "localhost", 
-    port: 9440, 
-    user: "default", 
-    password: "admin", 
+    hostname: "localhost",
+    port: 9440,
+    user: "default",
+    password: "admin",
     database: "default",
     tlsConfiguration: tls)
 ```
@@ -118,7 +118,7 @@ Because networks unreliable by nature, ClickHouseNIO uses different timeouts to 
 ```swift
 
 let config = try ClickHouseConfiguration(
-    hostname: "localhost", 
+    hostname: "localhost",
     ...,
     connectTimeout: .seconds(10),
     readTimeout: .seconds(90),
@@ -127,9 +127,9 @@ let config = try ClickHouseConfiguration(
 ```
 
 All timeouts will close the connection. Different timeouts trigger different exceptions:
-- `connectTimeout` will throw `NIO.ChannelError.connectTimeout(TimeAmount)` if the connection to the ClickHouse server cannot be establised after this period of time.
-- `readTimeout`: If a query is running, and the ClickHouseNIO client does not receive any network package, the conncection is closed and throws `ClickHouseError.readTimeout`. This can happen, if the network connection is interrupted while waiting for a response. Usually, even while waiting for a query result, packages are exchanged very frequently.
-- `queryTimeout` is the total time after a query will be terminated and the connection is closed. Because ClickHouseNIO is also capable of queueing queries, this includes the time in the queue as well. On a very busy server, a long waiting time starts to close connections. If a connection is closed, all queries in the queue will return a failed future with the exception `ClickHouseError.queryTimeout`. 
+- `connectTimeout` will throw `NIO.ChannelError.connectTimeout(TimeAmount)` if the connection to the ClickHouse server cannot be established after this period of time.
+- `readTimeout`: If a query is running, and the ClickHouseNIO client does not receive any network package, the connection is closed and throws `ClickHouseError.readTimeout`. This can happen, if the network connection is interrupted while waiting for a response. Usually, even while waiting for a query result, packages are exchanged very frequently.
+- `queryTimeout` is the total time after a query will be terminated and the connection is closed. Because ClickHouseNIO is also capable of queueing queries, this includes the time in the queue as well. On a very busy server, a long waiting time starts to close connections. If a connection is closed, all queries in the queue will return a failed future with the exception `ClickHouseError.queryTimeout`.
 
 Timeouts can also be specified for a single query with `connection.command(sql: sql, timeout: .seconds(30))`, but keep in mind that this also includes queue time.
 
