@@ -94,6 +94,7 @@ public indirect enum ClickHouseTypeName {
     case dateTime(ClickHouseColumnMetadata)
     case dateTime64(ClickHouseColumnMetadata)
     case array(ClickHouseTypeName)
+    case map(ClickHouseTypeName, ClickHouseTypeName)
     case nullable(ClickHouseTypeName)
 
     public init?(_ type: String) {
@@ -138,6 +139,24 @@ public indirect enum ClickHouseTypeName {
                 return nil
             }
             self = .array(subType)
+        }
+        else if type.starts(with: "Map(") {
+            let typeName = String(type.dropFirst("Map(".count).dropLast())
+            let typeNames = typeName.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            guard typeNames.count == 2 else {
+                return nil
+            }
+            guard let typeName = typeNames.first,
+                  let keyType = ClickHouseTypeName(typeName)
+            else {
+                return nil
+            }
+            guard let typeName = typeNames.last,
+                  let valueType = ClickHouseTypeName(typeName)
+            else {
+                return nil
+            }
+            self = .map(keyType, valueType)
         }
         else if type.starts(with: "Enum8(") {
             let columnMapping = String(type.dropFirst("Enum8(".count).dropLast())
@@ -249,6 +268,8 @@ public indirect enum ClickHouseTypeName {
         case .array(let subtype):
             // print("Array(\(subtype.string))")
             return "Array(\(subtype.string))"
+        case .map(let keyType, let valueType):
+            return "Map(\(keyType.string), \(valueType.string))"
         case .boolean:
             return "Bool"
         case .date:
@@ -373,8 +394,17 @@ public indirect enum ClickHouseTypeName {
                 return [Array<ClickHouseEnum8>].self
             case .array(_):
                 fatalError("array cannot be nested (for now)")
+            case .map(_, _):
+                fatalError("map cannot be nested (for now)")
             }
             return [String].self
+        case .map(let keyType, let valueType):
+            switch (keyType, valueType) {
+            case (.string, .string):
+                return [Dictionary<String, String>].self
+            default:
+                fatalError("Map(\(keyType.string), \(valueType.string)) not supported yet, only Map(String, String) are supported (for now)")
+            }
         case .boolean:
             return [Bool].self
         case .date:
@@ -419,6 +449,8 @@ public indirect enum ClickHouseTypeName {
                 return [String?].self
             case .array(_):
                 fatalError("no array in nullable (for now)")
+            case .map(_, _):
+                fatalError("no map in nullable (for now)")
             case .boolean:
                 return [Bool?].self
             case .date:
@@ -1102,4 +1134,65 @@ extension Array: ClickHouseDataType where Element: ClickHouseDataType {
     public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
         return .array(Element.getClickHouseTypeName(columnMetadata: columnMetadata))
     }
+}
+
+extension Dictionary: ClickHouseDataType where Key: ClickHouseDataType, Value: ClickHouseDataType {
+    
+    public static func getClickHouseTypeName(columnMetadata: ClickHouseColumnMetadata?) -> ClickHouseTypeName {
+        return .map(Key.getClickHouseTypeName(columnMetadata: columnMetadata), Value.getClickHouseTypeName(columnMetadata: columnMetadata))
+    }
+    
+    public static func writeTo(buffer: inout NIOCore.ByteBuffer, array: [Dictionary<Key, Value>], columnMetadata: ClickHouseColumnMetadata?) {
+        var offsets: [Int] = []
+        offsets.reserveCapacity(array.count)
+        var currentOffset = 0
+        for elements in array {
+            currentOffset += elements.count
+            offsets.append(currentOffset)
+        }
+        buffer.writeIntegerArray(offsets)
+        var keys = [Key]()
+        var values = [Value]()
+        keys.reserveCapacity(currentOffset)
+        values.reserveCapacity(currentOffset)
+        array.forEach {
+            $0.forEach { key, value in
+                keys.append(key)
+                values.append(value)
+            }
+        }
+        Key.writeTo(buffer: &buffer, array: keys, columnMetadata: columnMetadata)
+        Value.writeTo(buffer: &buffer, array: values, columnMetadata: columnMetadata)
+    }
+    
+    public static func readFrom(buffer: inout NIOCore.ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Dictionary<Key, Value>]? {
+        guard let offsets: [Int] = buffer.readIntegerArray(numRows: numRows) else {
+            return nil
+        }
+        var array: [Dictionary<Key, Value>] = []
+        array.reserveCapacity(numRows)
+        let total = offsets.last ?? 0
+        guard let keys = Key.readFrom(buffer: &buffer, numRows: total, columnMetadata: columnMetadata) else {
+            return nil // need more data
+        }
+        guard let values = Value.readFrom(buffer: &buffer, numRows: total, columnMetadata: columnMetadata) else {
+            return nil // need more data
+        }
+        var last = 0
+        for i in offsets {
+            var map: [Key: Value] = [:]
+            map.reserveCapacity(i - last)
+            for (key, value) in zip(keys[last..<i], values[last..<i]) {
+                map[key] = value
+            }
+            array.append(map)
+            last = i
+        }
+        return array
+    }
+    
+    public static var clickhouseDefault: Dictionary<Key, Value> {
+        [:]
+    }
+    
 }

@@ -265,7 +265,7 @@ final class ClickHouseNIOTests: XCTestCase {
         }.wait()
     }
 
-    func testArray() {
+    func testArray() throws {
         try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
 
         let sql = """
@@ -283,7 +283,7 @@ final class ClickHouseNIOTests: XCTestCase {
             ClickHouseColumn("id", idArr),
             ClickHouseColumn("arr", intArr)
         ]
-        try! conn.connection.insert(into: "test", data: data).wait()
+        try conn.connection.insert(into: "test", data: data).wait()
 
 
         print("send complete")
@@ -292,6 +292,79 @@ final class ClickHouseNIOTests: XCTestCase {
                 fatalError("Column `arr`, was not a Int32 array-array")
             }
             XCTAssertEqual(arr, [[1], [43, 65], [], [1234, -345, 1]])
+        }.wait()
+    }
+    
+    func testMap() throws {
+        try! conn.connection.command(sql: "DROP TABLE IF EXISTS test").wait()
+
+        let sql = """
+            CREATE TABLE test
+            (
+            id Int32,
+            m Map(String, String)
+            )
+            ENGINE = MergeTree() PRIMARY KEY id ORDER BY id
+            """
+        try conn.connection.command(sql: sql).wait()
+        let intArr = [
+            [
+                "A": "B",
+                "C": "D",
+                "E": "F",
+                "G": "H",
+            ],
+            [
+                "1": "2",
+                "3": "4",
+                "5": "6",
+            ],
+            [:],
+            [
+                "A1": "B2",
+                "C3": "D4",
+                "E5": "F6",
+                "G7": "H8",
+                "I9": "J0",
+            ]
+        ]
+        let idArr = [Int32(1),2,3,3,]
+        let data = [
+            ClickHouseColumn("id", idArr),
+            ClickHouseColumn("m", intArr)
+        ]
+        try conn.connection.insert(into: "test", data: data).wait()
+
+
+        print("send complete")
+        try conn.connection.query(sql: "SELECT * FROM test").map { res in
+            guard let arr = res.columns[1].values as? [[String: String]] else {
+                fatalError("Column `arr`, was not a String map")
+            }
+            XCTAssertEqual(
+                arr,
+                [
+                    [
+                        "A": "B",
+                        "C": "D",
+                        "E": "F",
+                        "G": "H",
+                    ],
+                    [
+                        "1": "2",
+                        "3": "4",
+                        "5": "6",
+                    ],
+                    [:],
+                    [
+                        "A1": "B2",
+                        "C3": "D4",
+                        "E5": "F6",
+                        "G7": "H8",
+                        "I9": "J0",
+                    ]
+                ]
+            )
         }.wait()
     }
 
