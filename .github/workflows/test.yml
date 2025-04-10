@@ -9,7 +9,7 @@ on:
 env:
   swift_package_resolve: swift package resolve
   swift_build: swift build --build-tests
-  swift_test: CLICKHOUSE_USER="default" CLICKHOUSE_PASSWORD="" swift test
+  swift_test: CLICKHOUSE_USER="user" CLICKHOUSE_PASSWORD="testpass" swift test
   cache_version: 1
   CLICKHOUSE_SERVER: clickhouse
 jobs:
@@ -34,6 +34,11 @@ jobs:
     services:
       clickhouse:
         image: clickhouse/clickhouse-server
+        env:
+          CLICKHOUSE_USER: "user" 
+          CLICKHOUSE_PASSWORD: "testpass"
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_DB: "my_database"
     steps:
     - name: Get Swift Version
       id: get-swift-version
@@ -43,7 +48,7 @@ jobs:
     - uses: actions/checkout@master
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: |
           .build
