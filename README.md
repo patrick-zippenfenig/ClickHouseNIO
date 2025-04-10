@@ -6,7 +6,7 @@ High performance Swift [ClickHouse](https://clickhouse.tech) client based on [Sw
 
 Features:
 - Asynchronous Swift NIO implementation. Perfect for concurrent APIs.
-- Native Swift data types support. Per table column a simple `[Float]`, `[Int]` or `[String]` array can be used.
+- Native Swift data types support. Per table column a simple `[Float]`, `[Int]` or `[String]` array can be used. Maps are also supported, but only `[String : String]` (for now).
 - Simple `query()`, `command()` and `insert()` operations
 
 This client provides raw query capabilities. Connection pooling or relational abstraction may be implemented on top of this library. For connection pooling and integration into Vapor use, [ClickHouseVapor](https://github.com/patrick-zippenfenig/ClickHouseVapor).
