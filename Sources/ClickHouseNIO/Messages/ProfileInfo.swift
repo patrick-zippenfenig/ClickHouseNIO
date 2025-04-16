@@ -15,7 +15,7 @@ struct ProfileInfo {
     let applied_limit: Bool
     let rows_before_limit: UInt64
     let calculated_rows_before_limit: Bool
-    
+
     init?(from buffer: inout ByteBuffer) {
         guard let rows = buffer.readVarInt64(),
             let blocks = buffer.readVarInt64(),

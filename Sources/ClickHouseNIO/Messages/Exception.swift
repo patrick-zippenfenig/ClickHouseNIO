@@ -14,8 +14,8 @@ struct ExceptionMessage: Error {
     let displayText: String
     let stackTrace: String
     // using array to nest structs
-    let nested: [ExceptionMessage]
-    
+    let nested: [Self]
+
     init?(from buffer: inout ByteBuffer) {
         guard let code: UInt32 = buffer.readInteger(),
             let name = buffer.readClickHouseString(),
@@ -25,7 +25,7 @@ struct ExceptionMessage: Error {
             return nil
         }
         if hasNested == 1 {
-            guard let nested = ExceptionMessage(from: &buffer) else {
+            guard let nested = Self(from: &buffer) else {
                 return nil
             }
             self.nested = [nested]

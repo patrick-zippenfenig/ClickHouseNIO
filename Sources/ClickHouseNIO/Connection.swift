@@ -1,9 +1,9 @@
+import Logging
 import NIO
 import NIOSSL
-import Logging
 @_exported import class NIO.EventLoopFuture
-@_exported import struct NIOSSL.TLSConfiguration
 @_exported import struct NIO.TimeAmount
+@_exported import struct NIOSSL.TLSConfiguration
 
 public struct ClickHouseConfiguration {
     public let serverAddresses: SocketAddress
@@ -14,7 +14,7 @@ public struct ClickHouseConfiguration {
     public let connectTimeout: TimeAmount
     public let readTimeout: TimeAmount
     public let queryTimeout: TimeAmount
-    
+
     public init(
         serverAddresses: SocketAddress,
         user: String? = nil,
@@ -34,7 +34,7 @@ public struct ClickHouseConfiguration {
         self.queryTimeout = queryTimeout
         self.connectTimeout = connectTimeout
     }
-    
+
     public init(
         hostname: String = "localhost",
         port: Int = ClickHouseConnection.defaultPort,
@@ -60,27 +60,27 @@ public struct ClickHouseConfiguration {
 }
 
 public class ClickHouseConnection {
-    static let DBMS_VERSION_MAJOR : UInt64 = 1;
-    static let DBMS_VERSION_MINOR : UInt64 = 1;
-    static let REVISION : UInt64           = 54126;
+    static let DBMS_VERSION_MAJOR: UInt64 = 1
+    static let DBMS_VERSION_MINOR: UInt64 = 1
+    static let REVISION: UInt64           = 54126
     public static var defaultPort = 9000
-    
+
     internal let channel: Channel
-    
+
     internal let queryTimeout: TimeAmount
-    
+
     /// Set to true if `close()` was called
     private var _isClosed = false
-    
+
     /// Also check if the channel is ok. After exceptions are thrown, the channel become inactive
     public var isClosed: Bool {
         return !channel.isActive || _isClosed
     }
-    
+
     public var eventLoop: EventLoop {
         return channel.eventLoop
     }
-    
+
     fileprivate init(channel: Channel, queryTimeout: TimeAmount) {
         self.channel = channel
         self.queryTimeout = queryTimeout
@@ -110,7 +110,7 @@ public class ClickHouseConnection {
                 return channel.eventLoop.makeFailedFuture(error)
             }
         }
-        
+
         return client.connect(to: configuration.serverAddresses).flatMap { channel in
             return channel.send(.clientConnect(database: configuration.database, user: configuration.user, password: configuration.password), timeout: configuration.queryTimeout).map { res in
                 guard case ClickHouseResult.serverInfo(_) = res else {
@@ -120,7 +120,7 @@ public class ClickHouseConnection {
             }
         }
     }
-    
+
     public func ping(timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
         return channel.send(.ping, timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.pong = res else {
@@ -129,7 +129,7 @@ public class ClickHouseConnection {
             return
         }
     }
-    
+
     public func query(sql: String, timeout: TimeAmount? = nil) -> EventLoopFuture<ClickHouseQueryResult> {
         return channel.send(.query(sql: sql), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.result(let result) = res else {
@@ -138,7 +138,7 @@ public class ClickHouseConnection {
             return result
         }
     }
-    
+
     public func command(sql: String, timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
         return channel.send(.command(sql: sql), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.queryExecuted = res else {
@@ -147,7 +147,7 @@ public class ClickHouseConnection {
             return
         }
     }
-    
+
     public func insert(into table: String, data: [ClickHouseColumn], timeout: TimeAmount? = nil) -> EventLoopFuture<Void> {
         return channel.send(.insert(table: table, data: data), timeout: timeout ?? queryTimeout).map { res in
             guard case ClickHouseResult.queryExecuted = res else {
@@ -156,7 +156,7 @@ public class ClickHouseConnection {
             return
         }
     }
-    
+
     /// Closes this connection.
     public func close() -> EventLoopFuture<Void> {
         _isClosed = true
@@ -188,31 +188,36 @@ extension Channel {
     }
 }
 
-enum ClientCodes : UInt64 {
+// swiftlint:disable operator_usage_whitespace
+enum ClientCodes: UInt64 {
     case Hello       = 0
     case Query       = 1
     case Data        = 2
     case Cancel      = 3
     case Ping        = 4
 }
-enum ServerCodes : UInt64 {
-    case Hello       = 0;    /// Имя, версия, ревизия.
-    case Data        = 1;    /// Блок данных со сжатием или без.
-    case Exception   = 2;    /// Исключение во время обработки запроса.
-    case Progress    = 3;    /// Прогресс выполнения запроса: строк считано, байт считано.
-    case Pong        = 4;    /// Ответ на Ping.
-    case EndOfStream = 5;    /// Все пакеты были переданы.
-    case ProfileInfo = 6;    /// Пакет с профайлинговой информацией.
-    case Totals      = 7;    /// Блок данных с тотальными значениями, со сжатием или без.
-    case Extremes    = 8;    /// Блок данных с минимумами и максимумами, аналогично.
+
+enum ServerCodes: UInt64 {
+    case Hello       = 0    /// Имя, версия, ревизия.
+    case Data        = 1    /// Блок данных со сжатием или без.
+    case Exception   = 2    /// Исключение во время обработки запроса.
+    case Progress    = 3    /// Прогресс выполнения запроса: строк считано, байт считано.
+    case Pong        = 4    /// Ответ на Ping.
+    case EndOfStream = 5    /// Все пакеты были переданы.
+    case ProfileInfo = 6    /// Пакет с профайлинговой информацией.
+    case Totals      = 7    /// Блок данных с тотальными значениями, со сжатием или без.
+    case Extremes    = 8    /// Блок данных с минимумами и максимумами, аналогично.
 }
-enum Stages : UInt64 {
-    case Complete    = 2;
+
+enum Stages: UInt64 {
+    case Complete    = 2
 }
-public enum CompressionState : UInt64 {
-    case Disable     = 0;
-    case Enable      = 1;
+
+public enum CompressionState: UInt64 {
+    case Disable     = 0
+    case Enable      = 1
 }
+// swiftlint:enable operator_usage_whitespace
 
 extension SocketAddress {
     /// Hostname if known
@@ -222,7 +227,7 @@ extension SocketAddress {
             return v.host.isEmpty ? nil : v.host
         case .v6(let v):
             return v.host.isEmpty ? nil : v.host
-        case .unixDomainSocket(_):
+        case .unixDomainSocket:
             return nil
         }
     }
