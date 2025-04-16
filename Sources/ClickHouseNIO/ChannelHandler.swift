@@ -9,7 +9,7 @@ import Foundation
 import Logging
 import NIO
 
-enum ClickHouseCommand {
+enum ClickHouseCommand: Sendable {
     case clientConnect(database: String, user: String, password: String)
     case query(sql: String)
     case command(sql: String)
@@ -17,7 +17,7 @@ enum ClickHouseCommand {
     case ping
 }
 
-enum ClickHouseResult {
+enum ClickHouseResult: Sendable {
     case serverInfo(ServerInfo)
     case error(ExceptionMessage)
     case result(ClickHouseQueryResult)
@@ -25,7 +25,7 @@ enum ClickHouseResult {
     case pong
 }
 
-public struct ClickHouseQueryResult {
+public struct ClickHouseQueryResult: Sendable {
     public let columns: [ClickHouseColumn]
 
     /// ClickHouse transmits multiple DataMessages for each query. Usually the first has all columns, but no data. Here we merge them together.
