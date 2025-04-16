@@ -5,7 +5,7 @@ import NIOSSL
 @_exported import struct NIO.TimeAmount
 @_exported import struct NIOSSL.TLSConfiguration
 
-public struct ClickHouseConfiguration {
+public struct ClickHouseConfiguration: Sendable {
     public let serverAddresses: SocketAddress
     public let user: String
     public let password: String
@@ -63,7 +63,7 @@ public class ClickHouseConnection {
     static let DBMS_VERSION_MAJOR: UInt64 = 1
     static let DBMS_VERSION_MINOR: UInt64 = 1
     static let REVISION: UInt64           = 54126
-    public static var defaultPort = 9000
+    public static let defaultPort = 9000
 
     internal let channel: Channel
 

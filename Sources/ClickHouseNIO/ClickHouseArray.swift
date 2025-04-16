@@ -8,7 +8,7 @@
 import Foundation
 import NIO
 
-public struct ClickHouseColumn {
+public struct ClickHouseColumn: Sendable {
     public let name: String
     public let values: ClickHouseDataTypeArray
 
@@ -24,7 +24,7 @@ public struct ClickHouseColumn {
     }
 }
 
-public protocol ClickHouseDataTypeArray {
+public protocol ClickHouseDataTypeArray: Sendable {
     var count: Int { get }
 
     func merge(with: [ClickHouseDataTypeArray]) throws -> ClickHouseDataTypeArray
@@ -567,7 +567,7 @@ public struct ClickHouseDate: ClickHouseDataType, CustomStringConvertible {
         return .date
     }
 
-    public var date: Date
+    public let date: Date
 
     public var description: String {
         "\(date)"
@@ -617,7 +617,7 @@ public struct ClickHouseDateTime64: ClickHouseDataType, CustomStringConvertible 
         return .dateTime64(columnMetadata!)
     }
 
-    public var date: Date
+    public let date: Date
 
     public init(_ exact: Date) {
         self.date = exact
@@ -659,7 +659,7 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
         return .dateTime(.dateTimeTimeZone(nil))
     }
 
-    public var date: Date
+    public let date: Date
 
     public init(_ exact: Date) {
         self.date = exact
@@ -677,7 +677,8 @@ public struct ClickHouseDateTime: ClickHouseDataType, CustomStringConvertible {
 /// Struct for an Enum based on an Int8, only has the word-field which is a String
 /// and the string representation of the enum, it doesn't know the corresponding Int8
 public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
-    public var word: String
+    public let word: String
+
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Self]? {
         guard case let .enum8Map(mapping) = columnMetadata! else {
             fatalError("enum8 should have enum8Map-enum for column-metadata, not \(String(describing: columnMetadata))")
@@ -715,8 +716,8 @@ public struct ClickHouseEnum8: ClickHouseDataType, CustomStringConvertible {
 }
 /// Struct for an Enum based on an Int16, only has the word-field which is a String
 /// and the string representation of the enum, it doesn't know the corresponding Int16
-public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible {
-    public var word: String
+public struct ClickHouseEnum16: ClickHouseDataType, CustomStringConvertible, Sendable {
+    public let word: String
 
     public static func readFrom(buffer: inout ByteBuffer, numRows: Int, columnMetadata: ClickHouseColumnMetadata?) -> [Self]? {
         guard case let .enum16Map(mapping) = columnMetadata! else {
