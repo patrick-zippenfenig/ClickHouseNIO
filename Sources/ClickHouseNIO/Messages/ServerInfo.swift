@@ -15,7 +15,7 @@ struct ServerInfo {
     let versionMinor: UInt64
     let revision: UInt64
     let timezone: String?
-    
+
     init?(from buffer: inout ByteBuffer) {
         guard let name = buffer.readClickHouseString(),
             let versionMajor = buffer.readVarInt64(),
@@ -27,7 +27,7 @@ struct ServerInfo {
         self.versionMajor = versionMajor
         self.versionMinor = versionMinor
         self.revision = revision
-        
+
         if revision >= ClickHouseMessageDecoder.DBMS_MIN_REVISION_WITH_SERVER_TIMEZONE {
             guard let tz = buffer.readClickHouseString() else {
                 return nil

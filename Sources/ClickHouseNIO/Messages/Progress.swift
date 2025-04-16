@@ -12,7 +12,7 @@ struct Progress {
     let rows: UInt64
     let bytes: UInt64
     let total_rows: UInt64?
-    
+
     init?(from buffer: inout ByteBuffer, revision: UInt64) {
         guard let rows = buffer.readVarInt64(),
             let bytes = buffer.readVarInt64() else {
