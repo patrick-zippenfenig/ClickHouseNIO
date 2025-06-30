@@ -46,7 +46,8 @@ extension Array: ClickHouseDataTypeArray where Element: ClickHouseDataType {
     }
 
     public func writeTo(buffer: inout ByteBuffer, type: ClickHouseTypeName, name: String) {
-        assert(type.string == Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string, "\(type.string), \(Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string)")
+        assert(type.string == Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string, "\(type.string) != \(Element.getClickHouseTypeName(columnMetadata: type.columnMetadata).string) (column: \(name))")
+        
         buffer.writeClickHouseString(name)
         if type.string.hasPrefix("Enum") {
             buffer.writeClickHouseString(type.string.replacingOccurrences(of: "\": ", with: "' = ").replacingOccurrences(of: ", \"", with: ", '"))
