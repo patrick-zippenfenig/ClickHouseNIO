@@ -8,13 +8,13 @@
 import Foundation
 import NIO
 
-struct ExceptionMessage: Error {
-    let code: UInt32
-    let name: String
-    let displayText: String
-    let stackTrace: String
+public struct ExceptionMessage: Error {
+    public let code: UInt32
+    public let name: String
+    public let displayText: String
+    public let stackTrace: String
     // using array to nest structs
-    let nested: [Self]
+    public let nested: [Self]
 
     init?(from buffer: inout ByteBuffer) {
         guard let code: UInt32 = buffer.readInteger(),
