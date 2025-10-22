@@ -8,7 +8,7 @@
 import Foundation
 import NIO
 
-public struct ExceptionMessage: Error {
+public struct ExceptionMessage: Error, Equatable {
     public let code: UInt32
     public let name: String
     public let displayText: String
