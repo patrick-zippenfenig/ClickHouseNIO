@@ -17,8 +17,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swift: ["5.10", "5.9", "5.8"]
+        swift: ["6.2", "6.1", "6.0", "5.10", "5.9", "5.8"]
         include:
+          - swift: "6.2"
+            container: "swift:6.2"
+            cache-version: 1
+          - swift: "6.1"
+            container: "swift:6.1"
+            cache-version: 1
+          - swift: "6.0"
+            container: "swift:6.0"
+            cache-version: 1
           - swift: "5.10"
             container: "swift:5.10"
             cache-version: 1
@@ -35,7 +44,7 @@ jobs:
       clickhouse:
         image: clickhouse/clickhouse-server
         env:
-          CLICKHOUSE_USER: "user" 
+          CLICKHOUSE_USER: "user"
           CLICKHOUSE_PASSWORD: "testpass"
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_DB: "my_database"
