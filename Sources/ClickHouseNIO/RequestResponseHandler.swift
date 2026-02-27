@@ -72,6 +72,18 @@ public final class RequestResponseHandler<Request, Response>: ChannelDuplexHandl
         promise.succeed(response)
     }
 
+    public func channelInactive(context: ChannelHandlerContext) {
+        if self.state.isOperational {
+            self.state = .error(ChannelError.ioOnClosedChannel)
+            let promiseBuffer = self.promiseBuffer
+            self.promiseBuffer.removeAll()
+            promiseBuffer.forEach {
+                $0.fail(ChannelError.ioOnClosedChannel)
+            }
+        }
+        context.fireChannelInactive()
+    }
+
     public func errorCaught(context: ChannelHandlerContext, error: Error) {
         guard self.state.isOperational else {
             assert(self.promiseBuffer.count == 0)
