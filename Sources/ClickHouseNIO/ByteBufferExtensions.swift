@@ -57,14 +57,14 @@ extension ByteBuffer {
     mutating func writeClickHouseStrings(_ strings: [String]) {
         let stringLen = strings.reduce(0, { $0 + $1.count })
         let offsetLen = strings.count * MemoryLayout<Int>.size
-        reserveCapacity(writableBytes + stringLen + offsetLen)
+        reserveCapacity(writerIndex + stringLen + offsetLen)
         for string in strings {
             writeClickHouseString(string)
         }
     }
 
     mutating func writeClickHouseFixedStrings(_ strings: [String], length: Int) {
-        reserveCapacity(writableBytes + length * strings.count)
+        reserveCapacity(writerIndex + length * strings.count)
         for string in strings {
             writeClickHouseFixedString(string, length: length)
         }
@@ -206,14 +206,14 @@ extension ByteBuffer {
     }
 
     mutating func writeIntegerArray<T: FixedWidthInteger>(_ array: [T]) {
-        reserveCapacity(array.count * MemoryLayout<T>.size + writableBytes)
+        reserveCapacity(writerIndex + array.count * MemoryLayout<T>.size)
         for element in array {
             writeInteger(element, endianness: .little)
         }
     }
 
     mutating func writeOptionalIntegerArray<T: FixedWidthInteger>(_ array: [T?]) {
-        reserveCapacity(array.count * (MemoryLayout<T>.size + 1) + writableBytes)
+        reserveCapacity(writerIndex + array.count * (MemoryLayout<T>.size + 1))
         // Frist write one array with 0/1 for nullable, then data
         for element in array {
             if element == nil {
@@ -233,7 +233,7 @@ extension ByteBuffer {
 
     /// Write UUID array for clickhouse
     mutating func writeUuidArray(_ array: [UUID], endianness: Endianness = .big) {
-        reserveCapacity(array.count * MemoryLayout<UUID>.size + writableBytes)
+        reserveCapacity(writerIndex + array.count * MemoryLayout<UUID>.size)
         for element in array {
             switch endianness {
             case .big:
