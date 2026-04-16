@@ -1061,7 +1061,7 @@ extension Optional: ClickHouseDataType where Wrapped: ClickHouseDataType {
     }
 
     public static func writeTo(buffer: inout ByteBuffer, array: [Wrapped?], columnMetadata: ClickHouseColumnMetadata?) {
-        buffer.reserveCapacity(array.count * (1) + buffer.writableBytes)
+        buffer.reserveCapacity(buffer.writerIndex + array.count)
         // Frist write one array with 0/1 for nullable, then data
         for element in array {
             if element == nil {
